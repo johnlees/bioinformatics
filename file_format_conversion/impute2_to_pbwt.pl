@@ -11,11 +11,18 @@ use Getopt::Long;
 use List::Util qw( min max );
 use Data::Dumper;
 
+my $help_message = "Usage: impute2_to_pbwt.pl -i <input.gen> -o <output prefix> -c <chromosome>";
+
 my ($input_file, $output_prefix, $chromosome);
-GetOptions ("input=s"  => \$input_file,
+GetOptions ("input|i=s"  => \$input_file,
             "output|o=s" => \$output_prefix,
-            "chr=s" => \$chromosome
+            "chr|c=s" => \$chromosome
 		   ) or die("Couldn't read command line input");
+
+if (!defined($input_file) || !defined($output_prefix) || !defined($chromosome))
+{
+   die($help_message);
+}
 
 open(GEN, $input_file) || die ("Couldn't open $input_file");
 open(NEWGEN, ">tmp.gen") || die ("Could write to tmp.gen");
