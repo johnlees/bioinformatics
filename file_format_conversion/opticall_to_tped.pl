@@ -77,14 +77,25 @@ else
    open my $tped_out, ">:encoding(utf8)", "$out_tped" or die "$out_tped: $!";
    open my $tfam_out, ">:encoding(utf8)", "$out_tfam" or die "$out_tfam: $!";
 
-   # Header line goes to tfam
+   # Header line goes to tfam (this will be the same for all chromosome files)
    my $header_row = $csv->getline($calls_in);
    my $row_length = scalar(@$header_row);
 
    for (my $i = 4; $i < $row_length; $i++)
    {
       my $sample = $header_row->[$i];
-      my @tfam_line = ($sample, $sample, 0, 0, $genders{$sample}, $phenotype);
+
+      my $gender;
+      if (defined($genders{$sample}) && $genders{$sample} == 1 || $genders{$sample} == 2)
+      {
+         $gender =  $genders{$sample};
+      }
+      else
+      {
+         $gender = 0;
+      }
+
+      my @tfam_line = ($sample, $sample, 0, 0, $gender, $phenotype);
 
       # write tfam line
       $csv->print($tfam_out, \@tfam_line);
