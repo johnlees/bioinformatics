@@ -3,7 +3,7 @@
 use strict;
 
 # First run
-# cut -d "," -f 2,21 humanomniexpress-12v1-1_b.csv > humanomniexpress-12v1-1_b.strands
+# cut -d "," -f 2,3 humanomniexpress-12v1-1_b.csv > humanomniexpress-12v1-1_b.strands
 #
 # run this as ./strand_flip_list.pl > snplist.txt
 #
@@ -16,7 +16,7 @@ while (my $strand_line = <STRANDS>)
 
    my($rsid, $strand) = split(",", $strand_line);
 
-   if ($strand eq "-")
+   if ($strand eq "BOT")
    {
       print "$rsid\n"
    }
