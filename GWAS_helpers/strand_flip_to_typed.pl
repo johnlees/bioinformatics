@@ -8,7 +8,7 @@ use strict;
 # run this as ./strand_flip_list.pl > snplist.txt
 #
 
-open (STRANDS, "humanomniexpress-12v1-1_b.strands") || die("Could not open strand file");
+open (STRANDS, "HumanOmniExpress-12v1_J.strands") || die("Could not open strand file");
 
 while (my $strand_line = <STRANDS>)
 {
