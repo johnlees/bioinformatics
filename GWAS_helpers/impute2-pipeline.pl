@@ -7,8 +7,8 @@ use warnings;
 # Globals
 #
 my $wait_time = 30;
-my $default_memory = 2000;
-my $mem_increment = 1000;
+my $default_memory = 9000;
+my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
 # file locations
@@ -72,7 +72,7 @@ sub check_status($)
    my $bjobs = `bjobs -a -noheader -o "stat exit_code delimiter=','" $jobid`;
    my ($bjobs_stat, $exit_code) = split(/,/, $bjobs);
 
-   if ($bjobs_stat eq "RUN")
+   if ($bjobs_stat eq "RUN" || $bjobs_stat eq "PEND")
    {
       $status = "RUN";
    }
@@ -120,16 +120,16 @@ sub run_impute2($$$)
    {
       $h_file = "$ref_directory/$ref_prefix$chr$hap_suffix";
       $l_file = "$ref_directory/$ref_prefix$chr$leg_suffix";
-      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$chr.$chunk.gen";
+      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
    else
    {
       $h_file = "$ref_directory/$X_prefix$chr$X_hap_suffix";
       $l_file = "$ref_directory/$X_prefix$chr$X_leg_suffix";
-      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$chr.$chunk.gen";
+      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
 
-   my $bsub_command = 'bsub -J "impute2" -o impute2.%J' . ".$chr.$chunk.o -e impute2.%J.$chr.$chunk -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . "-M$memory";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . "-M$memory";
 
    # Job <5521290> is submitted to queue <small>.
    my $submit = `$bsub_command $impute2_command`;
@@ -241,7 +241,22 @@ while ($imputation_ongoing)
    sleep($wait_time);
 }
 
-# Cat output files
+print LOG "\n\n All jobs finished - creating final output \n\n";
+
+# Concat output files
+
+foreach my $chr (sort keys %jobid)
+{
+   my $cat_command = "cat ";
+   for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
+   {
+      $cat_command .= "$output_directory/$chr.$chunk.gen ";
+   }
+   $cat_command .= "> $output_directory/$chr.gen";
+
+   my $cat_result = `$cat_command`;
+   print LOG "Chromosome $chr output: $output_directory/$chr.gen result: $cat_result\n";
+}
 
 close LOG;
 close ERRORS;
