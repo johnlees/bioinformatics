@@ -250,12 +250,14 @@ foreach my $chr (sort keys %jobid)
    my $cat_command = "cat ";
    for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
    {
-      $cat_command .= "$output_directory/$chr.$chunk.gen ";
+      $cat_command .= "$output_directory/$ref_prefix.impute2.$chr.$chunk.gen ";
    }
-   $cat_command .= "> $output_directory/$chr.gen";
+   my $output_file = "$output_directory/$ref_prefix.impute2.chr$chr.gen";
+   $cat_command .= "> $output_file";
 
    my $cat_result = `$cat_command`;
-   print LOG "Chromosome $chr output: $output_directory/$chr.gen result: $cat_result\n";
+   print LOG "Chromosome $chr output: $output_file result: $cat_result\n";
+   system("gzip $output_file");
 }
 
 close LOG;
