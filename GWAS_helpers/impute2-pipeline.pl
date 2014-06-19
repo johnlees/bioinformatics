@@ -1,13 +1,15 @@
 #!/usr/bin/perl -w
-#
+
 use strict;
 use warnings;
+
+use POSIX;
 
 #
 # Globals
 #
 my $wait_time = 30;
-my $default_memory = 9000;
+my $default_memory = 3000;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
@@ -80,7 +82,17 @@ sub check_status($)
    }
    elsif ($bjobs_stat eq "EXIT" && $exit_code == 130)
    {
-      $status = "MEMLIMIT";
+      my $mem_over = `bjobs -l $jobid | grep -l "TERM_MEMLIMIT" | wc -l`;
+      chomp($mem_over);
+
+      if ($mem_over == 1)
+      {
+         $status = "MEMLIMIT";
+      }
+      else
+      {
+         $status = "Status: $bjobs_stat. Exit code: $exit_code. NOT memlimit exceeded";
+      }
    }
    elsif ($bjobs_stat eq "DONE" && $exit_code == 0)
    {
@@ -131,7 +143,7 @@ sub run_impute2($$$)
       $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
 
-   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . "-M$memory -q long";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . " -M$memory -q long";
 
    # example output: Job <5521290> is submitted to queue <normal>.
    my $submit = `$bsub_command $impute2_command`;
@@ -154,7 +166,7 @@ sub the_time()
    $year = sprintf("%02d", $year % 100);
    $mon += 1;
 
-   my $time_string = "$year-$mon-$hour-$min-$sec";
+   my $time_string = "$year-$mon-$mday/$hour:$min:$sec";
 
    return $time_string;
 }
@@ -200,6 +212,9 @@ sub read_job_id_file()
 #* Main                                                                                 *#
 #****************************************************************************************#
 
+open(LOG, ">>impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
+open(ERRORS, ">>impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
+
 # Get number of jobs per chromosome
 my %num_jobs;
 
@@ -207,10 +222,11 @@ for (my $i = 1; $i <= 22; $i++)
 {
    my $file_name = "$ref_directory/$ref_prefix$i$leg_suffix";
    $num_jobs{$i} = chrom_jobs($file_name);
+   print LOG "Chr $i has $num_jobs{$i} chunks of 5Mb\n";
 }
-my $x_chr_name = "$X_prefix$X_leg_suffix";
+my $x_chr_name = "$ref_directory/$X_prefix$X_leg_suffix";
 $num_jobs{"X"} = chrom_jobs($x_chr_name);
-
+print LOG "Chr X has " . $num_jobs{"X"} . " chunks of 5Mb\n";
 
 my %jobid;
 my %memory;
@@ -240,9 +256,6 @@ update_job_id_file(\%jobid);
 my $imputation_ongoing = 1;
 my %processed;
 
-open(LOG, ">>impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
-open(ERRORS, ">>impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
-
 while ($imputation_ongoing)
 {
    $imputation_ongoing = 0;
@@ -269,8 +282,15 @@ while ($imputation_ongoing)
                }
                elsif ($status eq "MEMLIMIT")
                {
-                  $memory{$chr}{$chunk} += $mem_increment;
-                  print LOG "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with" . $memory{$chr}{$chunk} . "MB\n";
+                  if (!defined($memory{$chr}{$chunk}) || $memory{$chr}{$chunk} <= $default_memory)
+                  {
+                     $memory{$chr}{$chunk} = $mem_increment + $default_memory;
+                  }
+                  else
+                  {
+                     $memory{$chr}{$chunk} += $mem_increment;
+                  }
+                  print LOG "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with " . $memory{$chr}{$chunk} . "MB\n";
                   $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
                   update_job_id_file(\%jobid);
                   $imputation_ongoing = 1;
@@ -289,10 +309,11 @@ while ($imputation_ongoing)
          }
       }
    }
+   print LOG "Jobs checked. Waiting $wait_time seconds\n\n";
    sleep($wait_time);
 }
 
-print LOG "\n\n All jobs finished - creating final output \n\n";
+print LOG "All jobs finished - creating final output \n\n";
 
 # Concat output files
 
