@@ -11,6 +11,8 @@ my $default_memory = 9000;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
+my $job_id_file = "job_ids.log";
+
 # file locations
 my $input_prefix = "cases-ALS-BPROOF-clean";
 my $ref_directory = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono";
@@ -112,7 +114,7 @@ sub run_impute2($$$)
    my $int_end = $int_start + $chunk_length;
 
    my $m_file = "$ref_directory/$ref_prefix$chr$map_suffix";
-   my $g_file = "$input_prefix.$chr.gen.gz";
+   my $g_file = "$input_prefix.$chr.haps";
    my $g_sample_file = "$input_prefix.$chr.sample";
 
    my ($h_file, $l_file, $impute2_command);
@@ -120,18 +122,18 @@ sub run_impute2($$$)
    {
       $h_file = "$ref_directory/$ref_prefix$chr$hap_suffix";
       $l_file = "$ref_directory/$ref_prefix$chr$leg_suffix";
-      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
    else
    {
       $h_file = "$ref_directory/$X_prefix$chr$X_hap_suffix";
       $l_file = "$ref_directory/$X_prefix$chr$X_leg_suffix";
-      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
 
-   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . "-M$memory";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . "-M$memory -q long";
 
-   # Job <5521290> is submitted to queue <small>.
+   # example output: Job <5521290> is submitted to queue <normal>.
    my $submit = `$bsub_command $impute2_command`;
 
    if ($submit =~ /^Job <(\d+)>/)
@@ -157,6 +159,43 @@ sub the_time()
    return $time_string;
 }
 
+sub update_job_id_file($)
+{
+   my ($job_hash_ref) = @_;
+   my %job_hash = %$job_hash_ref;
+
+   open(JOBS, ">$job_id_file") || die("Could not open $job_id_file: $!");
+
+   foreach my $chr (sort keys %job_hash)
+   {
+      foreach my $chunk (sort keys %{$job_hash{$chr}})
+      {
+         my $job_line = join("\t", $job_hash{$chr}{$chunk}, $chr, $chunk);
+         print JOBS "$job_line\n";
+      }
+   }
+
+   close JOBS;
+}
+
+sub read_job_id_file()
+{
+   my %job_ids;
+   open(JOBS, $job_id_file) || die("Could not open $job_id_file: $!");
+
+   while (my $job_line = <JOBS>)
+   {
+      chomp($job_line);
+
+      my ($job_id, $chr, $chunk) = split(/\t/, $job_line);
+      $job_ids{$chr}{$chunk} = $job_id;
+   }
+
+   close JOBS;
+
+   return(\%job_ids);
+}
+
 #****************************************************************************************#
 #* Main                                                                                 *#
 #****************************************************************************************#
@@ -180,19 +219,29 @@ my %memory;
 my @chrs = (1..22);
 push(@chrs, "X");
 
-foreach my $chr (@chrs)
+if (!-e $job_id_file)
 {
-   for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
+   foreach my $chr (@chrs)
    {
-      $jobid{$chr}{$chunk} = 0;
+      for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
+      {
+         $jobid{$chr}{$chunk} = 0;
+      }
    }
 }
+else
+{
+   my $jobs_in = read_job_id_file();
+   %jobid = %$jobs_in;
+}
+
+update_job_id_file(\%jobid);
 
 my $imputation_ongoing = 1;
 my %processed;
 
-open(LOG, ">impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
-open(ERRORS, ">impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
+open(LOG, ">>impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
+open(ERRORS, ">>impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
 
 while ($imputation_ongoing)
 {
@@ -206,6 +255,7 @@ while ($imputation_ongoing)
          {
             $memory{$chr}{$chunk} = $default_memory;
             $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
+            update_job_id_file(\%jobid);
             $imputation_ongoing = 1;
          }
          else
@@ -222,6 +272,7 @@ while ($imputation_ongoing)
                   $memory{$chr}{$chunk} += $mem_increment;
                   print LOG "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with" . $memory{$chr}{$chunk} . "MB\n";
                   $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
+                  update_job_id_file(\%jobid);
                   $imputation_ongoing = 1;
                }
                elsif ($status eq "DONE")
