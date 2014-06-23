@@ -8,8 +8,8 @@ use POSIX;
 #
 # Globals
 #
-my $wait_time = 30;
-my $default_memory = 9000;
+my $wait_time = 300;
+my $default_memory = 9500;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
@@ -19,6 +19,7 @@ my $job_id_file = "job_ids.log";
 my $input_prefix = "shapeit2/cases-ALS-BPROOF.shapeit2.chr";
 my $ref_directory = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono";
 my $output_directory = "impute2";
+my $output_prefix = "cases-ALS-BPROOF";
 
 my $map_prefix = "genetic_map_chr";
 my $map_suffix = "_combined_b37.txt";
@@ -67,6 +68,7 @@ sub check_status($)
    my $status;
 
    my $bjobs = `bjobs -a -noheader -o "stat exit_code delimiter=','" $jobid`;
+
    my ($bjobs_stat, $exit_code) = split(/,/, $bjobs);
 
    if ($bjobs_stat eq "RUN" || $bjobs_stat eq "PEND")
@@ -127,17 +129,17 @@ sub run_impute2($$$)
       $g_file = "$input_prefix$chr.haps";
       $g_sample_file = "$input_prefix$chr.sample";
 
-      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
    else
    {
-      $h_file = "$ref_directory/$X_prefix$chr$X_hap_suffix";
-      $l_file = "$ref_directory/$X_prefix$chr$X_leg_suffix";
+      $h_file = "$ref_directory/$X_prefix$X_hap_suffix";
+      $l_file = "$ref_directory/$X_prefix$X_leg_suffix";
       $m_file = "$ref_directory/$map_prefix" . "X_nonPAR" . "$map_suffix";
       $g_file = "$input_prefix" . "X.haps";
       $g_sample_file = "$input_prefix" . "X.sample";
 
-      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
 
    my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q long";
