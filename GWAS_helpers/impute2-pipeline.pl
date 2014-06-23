@@ -42,6 +42,7 @@ sub chrom_jobs($)
 
    my $last_line;
 
+   # Open zipped legend file
    open(LEGEND, "gzip -dc $chrom_file |") or die("Could not open $chrom_file\n");
    while (my $legend_line = <LEGEND>)
    {
@@ -49,6 +50,7 @@ sub chrom_jobs($)
       $last_line = $legend_line if eof;
    }
 
+   # Take length as final reported position in the reference panel
    my ($rsid, $position, $a0, $a1, $var_type, $seq_type, @pop_maf) = split(/\s+/, $last_line);
    my $num_jobs = ceil($position / $chunk_length);
 
@@ -67,20 +69,26 @@ sub check_status($)
 
    my $status;
 
+   # Check the status of the jobid specified, returning status and exit code
+   # comma separated
    my $bjobs = `bjobs -a -noheader -o "stat exit_code delimiter=','" $jobid`;
+   chomp($bjobs);
 
    my ($bjobs_stat, $exit_code) = split(/,/, $bjobs);
 
    if ($bjobs_stat eq "RUN" || $bjobs_stat eq "PEND")
    {
+      # Job still in queue, or still running
       $status = "RUN";
    }
-   elsif ($bjobs_stat eq "EXIT" && $exit_code == 130)
+   elsif ($bjobs_stat eq "EXIT" && $exit_code eq "130")
    {
+      # Job terminated by LSF - check it's due to memory limit being exceeded
+      # using another bjobs command
       my $mem_over = `bjobs -l $jobid | grep -l "TERM_MEMLIMIT" | wc -l`;
       chomp($mem_over);
 
-      if ($mem_over == 1)
+      if ($mem_over eq "1")
       {
          $status = "MEMLIMIT";
       }
@@ -89,12 +97,24 @@ sub check_status($)
          $status = "Status: $bjobs_stat. Exit code: $exit_code. NOT memlimit exceeded";
       }
    }
-   elsif ($bjobs_stat eq "DONE" && $exit_code == 0)
+   elsif ($bjobs_stat eq "DONE")
    {
-      $status = "DONE";
+      # Job done - check the LSF output to check it was actually completed
+      my $successfully_complete = `bjobs -l $jobid | grep -l "Successfully completed" | wc -l`;
+      chomp($successfully_complete);
+
+      if ($successfully_complete eq "1")
+      {
+         $status = "DONE";
+      }
+      else
+      {
+         $status = "Status: $bjobs_stat. Exit code: $exit_code";
+      }
    }
    else
    {
+      # Other status
       $status = "Status: $bjobs_stat. Exit code: $exit_code";
    }
 
@@ -108,6 +128,9 @@ sub run_impute2($$$)
 
    my $jobid;
 
+   # Submit an impute2 job over LSF, for a 5Mb chunk of chr, using memory MB of
+   # RAM
+   #
    # e.g. ./impute2 \
    # -m ./Example/example.chr22.map \
    # -h ./Example/example.chr22.1kG.haps \
@@ -120,6 +143,8 @@ sub run_impute2($$$)
    my $int_start = ($chunk - 1) * $chunk_length;
    my $int_end = $int_start + $chunk_length;
 
+   # Set up all the correct file names, which must be different for the
+   # X chromosome
    my ($m_file, $g_file, $g_sample_file, $h_file, $l_file, $impute2_command);
    unless ($chr eq "X")
    {
@@ -142,8 +167,11 @@ sub run_impute2($$$)
       $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
 
+   # LSF part of the command specifies memory usage, stdout and stderr files
+   # and queue
    my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q long";
 
+   # Submit to LSF, and get the returned string which is then parsed for job id
    # example output: Job <5521290> is submitted to queue <normal>.
    my $submit = `$bsub_command $impute2_command`;
 
@@ -161,6 +189,7 @@ sub run_impute2($$$)
 
 sub the_time()
 {
+   # Returns the current time in the format yyyy-mm-dd/hh:mm:ss
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
    $year = sprintf("%02d", $year % 100);
    $mon += 1;
@@ -172,9 +201,11 @@ sub the_time()
 
 sub update_job_id_file($)
 {
+   # Get hash reference, then dereference it
    my ($job_hash_ref) = @_;
    my %job_hash = %$job_hash_ref;
 
+   # Job id file is tab delimited file with jobid, chromosome and chunk
    open(JOBS, ">$job_id_file") || die("Could not open $job_id_file: $!");
 
    foreach my $chr (sort keys %job_hash)
@@ -194,6 +225,7 @@ sub read_job_id_file()
    my %job_ids;
    open(JOBS, $job_id_file) || die("Could not open $job_id_file: $!");
 
+   # Put job ids into a hash, and return the reference to it
    while (my $job_line = <JOBS>)
    {
       chomp($job_line);
@@ -211,6 +243,7 @@ sub read_job_id_file()
 #* Main                                                                                 *#
 #****************************************************************************************#
 
+# Append log output to file, as well as stdout
 open(LOG, ">>impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
 open(ERRORS, ">>impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
 
@@ -236,6 +269,8 @@ my %memory;
 my @chrs = (1..22);
 push(@chrs, "X");
 
+# If job id file already exists, use these job ids. Useful if the pipeline is
+# restarted while the computation is ongoing
 if (!-e $job_id_file)
 {
    foreach my $chr (@chrs)
@@ -252,6 +287,7 @@ else
    %jobid = %$jobs_in;
 }
 
+# Write job ids hash to the job id file
 update_job_id_file(\%jobid);
 
 my $imputation_ongoing = 1;
@@ -259,16 +295,21 @@ my %processed;
 
 while ($imputation_ongoing)
 {
+   # Keep looping whenever a job is still going
    $imputation_ongoing = 0;
 
+   # Loop through chromosomes and chunks
    foreach my $chr (sort keys %jobid)
    {
       foreach my $chunk (sort keys %{$jobid{$chr}})
       {
          if ($jobid{$chr}{$chunk} == 0)
          {
+            # Job not yet submitted - first try with default memory
             $memory{$chr}{$chunk} = $default_memory;
             $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
+
+            # New job id, and check on next run
             update_job_id_file(\%jobid);
             $imputation_ongoing = 1;
          }
@@ -279,10 +320,16 @@ while ($imputation_ongoing)
                my $status = check_status($jobid{$chr}{$chunk});
                if ($status eq "RUN")
                {
+                  # There's a job still running - do nothing but check it next
+                  # time
                   $imputation_ongoing = 1;
                }
                elsif ($status eq "MEMLIMIT")
                {
+                  # Job failed due to running out of memory, increase the
+                  # amount requested the the increment specified, or at least
+                  # base + increment if not in the hash (because the pipeline
+                  # was stopped, but then job ids were loaded from file)
                   if (!defined($memory{$chr}{$chunk}) || $memory{$chr}{$chunk} <= $default_memory)
                   {
                      $memory{$chr}{$chunk} = $mem_increment + $default_memory;
@@ -294,9 +341,13 @@ while ($imputation_ongoing)
                   print LOG "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with " . $memory{$chr}{$chunk} . "MB\n";
                   print "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with " . $memory{$chr}{$chunk} . "MB\n";
                   $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
+
+                  # New job id
                   update_job_id_file(\%jobid);
                   $imputation_ongoing = 1;
                }
+               # Add job to processed list if any other status, but write
+               # sensible output to the log/error files
                elsif ($status eq "DONE")
                {
                   print LOG "Chromosome:$chr chunk:$chunk complete at " . the_time() . "\n";
@@ -313,6 +364,8 @@ while ($imputation_ongoing)
          }
       }
    }
+
+   # Wait before checking jobs again
    print LOG "Jobs checked. Waiting $wait_time seconds\n\n";
    print "Jobs checked. Waiting $wait_time seconds\n\n";
    sleep($wait_time);
@@ -328,13 +381,15 @@ foreach my $chr (sort keys %jobid)
    my $cat_command = "cat ";
    for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
    {
-      $cat_command .= "$output_directory/$ref_prefix.impute2.$chr.$chunk.gen ";
+      $cat_command .= "$output_directory/$output_prefix.impute2.$chr.$chunk ";
    }
-   my $output_file = "$output_directory/$ref_prefix.impute2.chr$chr.gen";
+   my $output_file = "$output_directory/$output_prefix.impute2.chr$chr.gen";
    $cat_command .= "> $output_file";
 
    my $cat_result = `$cat_command`;
    print LOG "Chromosome $chr output: $output_file result: $cat_result\n";
+
+   # Compress final output
    system("gzip $output_file");
 }
 
