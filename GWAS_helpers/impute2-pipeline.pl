@@ -9,14 +9,14 @@ use POSIX;
 # Globals
 #
 my $wait_time = 30;
-my $default_memory = 3000;
+my $default_memory = 9000;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
 my $job_id_file = "job_ids.log";
 
 # file locations
-my $input_prefix = "cases-ALS-BPROOF-clean";
+my $input_prefix = "shapeit2/cases-ALS-BPROOF.shapeit2.chr";
 my $ref_directory = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono";
 my $output_directory = "impute2";
 
@@ -40,13 +40,6 @@ sub chrom_jobs($)
    my ($chrom_file) = @_;
 
    my $last_line;
-
-   # Reading through zipped legend files prohibilitvely slow
-   #tie (*LEGEND, 'IO::Zlib', $chrom_file, "rb") or die("Could not open $chrom_file\n");
-   #while ($legend_line = <LEGEND>)
-   #{
-   #   # Get to end of file
-   #}
 
    open(LEGEND, "gzip -dc $chrom_file |") or die("Could not open $chrom_file\n");
    while (my $legend_line = <LEGEND>)
@@ -125,25 +118,29 @@ sub run_impute2($$$)
    my $int_start = ($chunk - 1) * $chunk_length;
    my $int_end = $int_start + $chunk_length;
 
-   my $m_file = "$ref_directory/$ref_prefix$chr$map_suffix";
-   my $g_file = "$input_prefix.$chr.haps";
-   my $g_sample_file = "$input_prefix.$chr.sample";
-
-   my ($h_file, $l_file, $impute2_command);
+   my ($m_file, $g_file, $g_sample_file, $h_file, $l_file, $impute2_command);
    unless ($chr eq "X")
    {
       $h_file = "$ref_directory/$ref_prefix$chr$hap_suffix";
       $l_file = "$ref_directory/$ref_prefix$chr$leg_suffix";
+      $m_file = "$ref_directory/$map_prefix$chr$map_suffix";
+      $g_file = "$input_prefix$chr.haps";
+      $g_sample_file = "$input_prefix$chr.sample";
+
       $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
    else
    {
       $h_file = "$ref_directory/$X_prefix$chr$X_hap_suffix";
       $l_file = "$ref_directory/$X_prefix$chr$X_leg_suffix";
+      $m_file = "$ref_directory/$map_prefix" . "X_nonPAR" . "$map_suffix";
+      $g_file = "$input_prefix" . "X.haps";
+      $g_sample_file = "$input_prefix" . "X.sample";
+
       $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$ref_prefix.impute2.$chr.$chunk";
    }
 
-   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory rusage[mem=$memory]" . '"' . " -M$memory -q long";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q long";
 
    # example output: Job <5521290> is submitted to queue <normal>.
    my $submit = `$bsub_command $impute2_command`;
@@ -223,10 +220,12 @@ for (my $i = 1; $i <= 22; $i++)
    my $file_name = "$ref_directory/$ref_prefix$i$leg_suffix";
    $num_jobs{$i} = chrom_jobs($file_name);
    print LOG "Chr $i has $num_jobs{$i} chunks of 5Mb\n";
+   print "Chr $i has $num_jobs{$i} chunks of 5Mb\n";
 }
 my $x_chr_name = "$ref_directory/$X_prefix$X_leg_suffix";
 $num_jobs{"X"} = chrom_jobs($x_chr_name);
 print LOG "Chr X has " . $num_jobs{"X"} . " chunks of 5Mb\n";
+print "Chr X has " . $num_jobs{"X"} . " chunks of 5Mb\n";
 
 my %jobid;
 my %memory;
@@ -291,6 +290,7 @@ while ($imputation_ongoing)
                      $memory{$chr}{$chunk} += $mem_increment;
                   }
                   print LOG "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with " . $memory{$chr}{$chunk} . "MB\n";
+                  print "Chromosome:$chr chunk:$chunk ran over memory limit, resubmitting with " . $memory{$chr}{$chunk} . "MB\n";
                   $jobid{$chr}{$chunk} = run_impute2($chr, $chunk, $memory{$chr}{$chunk});
                   update_job_id_file(\%jobid);
                   $imputation_ongoing = 1;
@@ -298,11 +298,13 @@ while ($imputation_ongoing)
                elsif ($status eq "DONE")
                {
                   print LOG "Chromosome:$chr chunk:$chunk complete at " . the_time() . "\n";
+                  print "Chromosome:$chr chunk:$chunk complete at " . the_time() . "\n";
                   $processed{$chr}{$chunk} = 1;
                }
                else
                {
                   print ERRORS "Chromosome:$chr chunk:$chunk jobid $jobid{$chr}{$chunk} failed with unknown error: $status\n";
+                  print "Chromosome:$chr chunk:$chunk jobid $jobid{$chr}{$chunk} failed with unknown error: $status\n";
                   $processed{$chr}{$chunk} = 1;
                }
             }
@@ -310,10 +312,12 @@ while ($imputation_ongoing)
       }
    }
    print LOG "Jobs checked. Waiting $wait_time seconds\n\n";
+   print "Jobs checked. Waiting $wait_time seconds\n\n";
    sleep($wait_time);
 }
 
 print LOG "All jobs finished - creating final output \n\n";
+print "All jobs finished - creating final output \n\n";
 
 # Concat output files
 
