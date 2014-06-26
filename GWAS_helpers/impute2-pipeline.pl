@@ -9,9 +9,12 @@ use POSIX;
 # Globals
 #
 my $wait_time = 300;
+
 my $default_memory = 9500;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
+
+my $qctool_memory = 1000;
 
 my $job_id_file = "job_ids.log";
 
@@ -154,7 +157,7 @@ sub run_impute2($$$)
       $g_file = "$input_prefix$chr.haps";
       $g_sample_file = "$input_prefix$chr.sample";
 
-      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$output_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
    else
    {
@@ -164,7 +167,7 @@ sub run_impute2($$$)
       $g_file = "$input_prefix" . "X.haps";
       $g_sample_file = "$input_prefix" . "X.sample";
 
-      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o $output_directory/$output_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
 
    # LSF part of the command specifies memory usage, stdout and stderr files
@@ -371,30 +374,23 @@ while ($imputation_ongoing)
    sleep($wait_time);
 }
 
-print LOG "All jobs finished - creating final output \n\n";
-print "All jobs finished - creating final output \n\n";
+print LOG "All impute2 jobs finished - creating final output with qctool \n\n";
+print "All impute2 jobs finished - creating final output with qctool \n\n";
 
-# Concat output files
+# Convert output files to bgen
 
 foreach my $chr (sort keys %jobid)
 {
-   my $cat_command = "cat ";
-   for (my $chunk = 1; $chunk <= $num_jobs{$chr}; $chunk++)
-   {
-      $cat_command .= "$output_directory/$output_prefix.impute2.$chr.$chunk ";
-   }
-   my $output_file = "$output_directory/$output_prefix.impute2.chr$chr.gen";
-   $cat_command .= "> $output_file";
+   my $qctool_command = "qctool -g $output_directory/$output_prefix.$chr.#.gz -og $output_directory/$output_prefix.chr$chr.bgen -assume-chromosome $chr";
+   my $bsub_command = "bsub -J " . '"qctool"' . " -o $output_directory/qctool.%J.$chr.o -e $output_directory/qctool.%J.$chr.e -R " . '"' . "select[mem>$qctool_memory] rusage[mem=$qctool_memory]" . '"' . " -M$qctool_memory -q normal";
 
-   my $cat_result = `$cat_command`;
-   print LOG "Chromosome $chr output: $output_file result: $cat_result\n";
-
-   # Compress final output
-   system("gzip $output_file");
+   system("$bsub_command $qctool_command");
 }
 
 close LOG;
 close ERRORS;
+
+unlink($job_id_file);
 
 exit(0);
 
