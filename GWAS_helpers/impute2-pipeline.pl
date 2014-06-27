@@ -14,7 +14,7 @@ my $default_memory = 9500;
 my $mem_increment = 1500;
 my $chunk_length = 5000000;
 
-my $qctool_memory = 1000;
+my $qctool_memory = 300;
 
 my $job_id_file = "job_ids.log";
 
@@ -103,7 +103,7 @@ sub check_status($)
    elsif ($bjobs_stat eq "DONE")
    {
       # Job done - check the LSF output to check it was actually completed
-      my $successfully_complete = `bjobs -l $jobid | grep -l "Successfully completed" | wc -l`;
+      my $successfully_complete = `bjobs -l $jobid | grep -l "Done successfully" | wc -l`;
       chomp($successfully_complete);
 
       if ($successfully_complete eq "1")
