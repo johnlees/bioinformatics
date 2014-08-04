@@ -5,9 +5,13 @@ use warnings;
 
 my $intensity_file = $ARGV[0];
 my $calls_file = $ARGV[1];
+my $rsid = $ARGV[2];
 
 my $R_tmp = "plot.Rscript";
 my $plot_tmp = "intensity_plot.tmp";
+
+my $tmp_intensity = "int.tmp";
+my $tmp_calls = "calls.tmp";
 
 # R script to do the plot
 my $R_script = <<'RSCRIPT';
@@ -32,6 +36,15 @@ if (!defined($intensity_file) || (!-e ($intensity_file)) || !defined($calls_file
 }
 else
 {
+   if (defined($rsid))
+   {
+      system("grep $rsid $calls_file > $tmp_calls");
+      system("grep $rsid $intensity_file > $tmp_intensity");
+
+      $intensity_file = $tmp_intensity;
+      $calls_file = $tmp_calls;
+   }
+
    open(INT, "$intensity_file") || die("Could not open $intensity_file");
    open(CALLS, "$calls_file") || die("Could not open $calls_file");
 
@@ -41,7 +54,7 @@ else
 
    # Get header line from int file
    my @intensities = split(/\s+/, $int_line);
-   my $rsid = shift(@intensities);
+   $rsid = shift(@intensities);
    my $pos = shift(@intensities);
    my $alleles = shift(@intensities);
 
@@ -72,7 +85,9 @@ else
    close RSCRIPT;
 
    system("R CMD BATCH $R_tmp");
-   unlink $R_tmp, $plot_tmp, "$R_tmp.Rout";
+   unlink $R_tmp, $plot_tmp, "$R_tmp.Rout", $tmp_calls, $tmp_intensity;
+
+   rename "intensity_plot.pdf", "$rsid" . "_intensity_plot.pdf";
 }
 
 exit(0);
