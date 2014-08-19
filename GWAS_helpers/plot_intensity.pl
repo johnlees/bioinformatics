@@ -32,7 +32,7 @@ RSCRIPT
 
 if (!defined($intensity_file) || (!-e ($intensity_file)) || !defined($calls_file) || (!-e ($calls_file)))
 {
-   print "Usage: ./plot_intensity.pl <intensity_file_line.txt> <calls.txt>\n";
+   print "Usage: ./plot_intensity.pl <intensity_file_line.txt> <calls.txt> (<rsid>)\n";
 }
 else
 {
