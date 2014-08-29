@@ -11,6 +11,9 @@ use Bio::Tools::GFF;
 my $tmp_annotation = "annotation.tmp";
 my $annotation_header_file = "annotation_headers.tmp";
 
+# Global locations of software needed
+our $bcftools = "/nfs/users/nfs_j/jl11/software/bin/bcftools";
+
 # Headers for bcftools annotation
 my $annotation_headers = <<HEADER;
 ##INFO=<ID=REGION_TYPE,Number=1,Type=String,Description="Type of region variant appears in">
@@ -75,11 +78,11 @@ sub transfer_annotation($$)
    system("tabix -s 1 -b 2 -e 3 $tmp_annotation.gz");
 
    # Also annotate allele counts at the same time
-   my $bcftools_command = "bcftools annotate -p fill-AN-AC -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file -O z $vcf_file";
+   my $bcftools_command = "$bcftools annotate -p fill-AN-AC -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file -O z $vcf_file";
    system($bcftools_command);
 
    # Need to refresh index
-   system("bcftools index $vcf_file");
+   system("$bcftools index $vcf_file");
 
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;

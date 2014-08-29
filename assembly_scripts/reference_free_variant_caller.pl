@@ -170,9 +170,9 @@ sub parse_read_file($)
    # locations.
    my ($read_file) = @_;
 
-   open(READS, $read_file) || die("Could not open $read_file: $!\n");
-   my %read_locations;
+   my (%read_locations, %decompress);
    my @sample_names;
+   open(READS, $read_file) || die("Could not open $read_file: $!\n");
 
    while (my $read_pair = <READS>)
    {
@@ -180,19 +180,29 @@ sub parse_read_file($)
       my ($sample_name, $forward_read, $backward_read) = split("\t", $read_pair);
       push(@sample_names, $sample_name);
 
-      # Decompress reads if needed
+      # Decompress reads if needed, spawing a thread to do so
       if ($forward_read =~ /\.gz$/)
       {
-         $forward_read = decompress_fastq($forward_read);
+         $decompress{$sample_name}{"forward"} = threads->create(\&decompress_fastq, $forward_read);
       }
       if ($backward_read =~ /\.gz$/)
       {
-         $backward_read = decompress_fastq($backward_read);
+         $decompress{$sample_name}{"backward"} = threads->create(\&decompress_fastq, $backward_read);
       }
 
       # Store in hash of hashes
       $read_locations{$sample_name}{"forward"} = $forward_read;
       $read_locations{$sample_name}{"backward"} = $backward_read;
+   }
+
+   # Wait for all decompression threads to complete, and overwrite read
+   # locations with new fastq paths
+   foreach my $sample (keys %decompress)
+   {
+      foreach my $direction (keys %{$decompress{$sample}})
+      {
+         $read_locations{$sample}{$direction} = $decompress{$sample}{$direction}->join();
+      }
    }
 
    close READS;
