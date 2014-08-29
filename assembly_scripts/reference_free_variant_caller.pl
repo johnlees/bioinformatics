@@ -91,15 +91,15 @@ Uses cortex_var to call variants between two samples without providing a referen
 sequence
 
    Options
-   -a, --assembly		Contigs of a de-novo assembly of one of the samples in
-   	            	multi-fasta format. See help for more info.
-   -g, --annotation	Annotation of the -a assembly in gff v3.
-   -r, --reads	      Tab delimited file of fastq or fastq.gz file locations.
-   	               One line per sample. First column sample name, second
+   -a, --assembly    Contigs of a de-novo assembly of one of the samples in
+                     multi-fasta format. See help for more info.
+   -g, --annotation  Annotation of the -a assembly in gff v3.
+   -r, --reads       Tab delimited file of fastq or fastq.gz file locations.
+                     One line per sample. First column sample name, second
                      column forward reads, third column reverse reads.
                      It is best to give absolute paths
-   -o, --output 	   Prefix for output vcfs
-   -h, --help	   	Shows more detailed help.
+   -o, --output      Prefix for output vcfs
+   -h, --help        Shows more detailed help.
 
 Requires: cortex_var, bcftools, quake and jellyfish. See help for more details
 USAGE
@@ -379,7 +379,11 @@ GetOptions ("assembly|a=s"  => \$assembly_file,
 		   ) or die($usage_message);
 
 # Parse input
-if (!defined($assembly_file) || !defined($annotation_file) || !defined($read_file) || !defined($output_prefix))
+if (defined($help))
+{
+   print $help_message;
+}
+elsif (!defined($assembly_file) || !defined($annotation_file) || !defined($read_file) || !defined($output_prefix))
 {
    print STDERR $usage_message;
 }
@@ -387,10 +391,6 @@ elsif (!-e $assembly_file || !-e $annotation_file || !-e $read_file)
 {
    print STDERR "One or more specified input files do not exist\n";
    print STDERR $usage_message;
-}
-elsif (defined($help))
-{
-   print $help_message;
 }
 elsif (check_binaries())
 {
