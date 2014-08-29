@@ -40,6 +40,7 @@ use warnings;
 use threads;
 use Getopt::Long;
 use Cwd;
+use File::Spec;
 
 use Cwd 'abs_path';
 use File::Basename;
@@ -204,11 +205,11 @@ sub decompress_fastq($)
    my $decompressed_location;
    my $cwd = getcwd();
 
-   if ($fastq =~ /\/(.+\.fastq)\.gz$/)
-   {
-      $decompressed_location = "$cwd/$1";
-   }
+   print STDERR "Decompressing $fastq\n";
+   my ($volume ,$directories, $file) = File::Spec->splitpath($fastq);
 
+   $file =~ m/^(.+\.fastq)\.gz/;
+   $decompressed_location = "$cwd/$1";
    system("gzip -d -c $fastq > $decompressed_location");
 
    return($decompressed_location);
@@ -237,9 +238,8 @@ sub quake_error_correct($)
 
    # Run quake
    mkdir "quake" || die("Could not create quake directory: $!\n");
-   chdir "quake";
 
-   my $quake_command = "$quake_location -f $quake_input_file_name -k $quake_kmer_size -p $quake_threads 2>&1 > quake.log";
+   my $quake_command = "cd quake && $quake_location -f ../$quake_input_file_name -k $quake_kmer_size -p $quake_threads &> quake.log";
    system($quake_command);
 
    # Set paths of corrected reads
@@ -248,14 +248,11 @@ sub quake_error_correct($)
    {
       foreach my $read_direction (keys %{$$reads{$sample}})
       {
-         if ($$reads{$sample}{$read_direction} =~ /\/(.+)\.fastq$/)
-         {
-            $corrected_reads{$sample}{$read_direction} = "$cwd/$1.cor.fastq";
-         }
+         my ($volume ,$directories, $file) = File::Spec->splitpath($$reads{$sample}{$read_direction});
+         $file =~ m/^(.+)\.fastq$/;
+         $corrected_reads{$sample}{$read_direction} = "$cwd/quake/$1.cor.fastq";
       }
    }
-
-   chdir "..";
 
    return(\%corrected_reads);
 }
@@ -268,25 +265,24 @@ sub prepare_reference($)
    my @cortex_threads;
 
    # Put assembly.fa location into file for cortex input
-   system("cat $reference_file > $ref_se");
+   system("echo $reference_file > $ref_se");
    mkdir "$ref_bin_dir" || die("Could not make directory $ref_bin_dir: $!\n");
-   chdir "$ref_bin_dir";
 
    # Dump a binary for each kmer being used
    my $i = 0;
 
    for (my $kmer = $first_kmer; $kmer<=$last_kmer; $kmer+= $kmer_step)
    {
-      $cortex_threads[$i] = threads->create(\&build_binary, $kmer, 1, "../$ref_se");
+      $cortex_threads[$i] = threads->create(\&build_binary, $kmer, 1, "$ref_se");
       $i++;
    }
 
    # Make a stampy hash of the reference
    my $stampy_command = "$stampy_location -G REF $reference_file";
-   system($stampy_command);
+   system("$stampy_command &> stampy.G.log");
 
    $stampy_command = "$stampy_location -g REF -H REF";
-   system($stampy_command);
+   system("$stampy_command &> stampy.gH.log");
 
    # Wait for cortex jobs to finish
    foreach my $thread (@cortex_threads)
@@ -294,7 +290,6 @@ sub prepare_reference($)
       $thread->join();
    }
 
-   chdir ".."
 }
 
 # Builds binaries of a reference using cortex
@@ -308,7 +303,7 @@ sub build_binary($$$)
    {
       if ($binary =~ /^cortex_var_(\d+)_c(\d+)$/)
       {
-         if ($1 >= $kmer && $2 >= $colours)
+         if ($1 >= $kmer && (($1-30) <= $kmer) && $2 >= $colours)
          {
             $correct_binary = $binary;
          }
@@ -322,8 +317,8 @@ sub build_binary($$$)
       die("No suitable binary for kmer $kmer and $colours colour(s) exists.\n");
    }
 
-   my $cortex_command = "$cortex_binaries/$correct_binary --kmer_size $kmer --mem_height $mem_height --mem_width $mem_width --se_list $ref_file --dump_binary ref.k$kmer.ctx --sample_id REF";
-   system("$cortex_command 2>&1 > ctx.ref.k$kmer.log");
+   my $cortex_command = "$cortex_binaries/$correct_binary --kmer_size $kmer --mem_height $mem_height --mem_width $mem_width --se_list $ref_file --dump_binary $ref_bin_dir/ref.k$kmer.ctx --sample_id REF";
+   system("$cortex_command &> $ref_bin_dir/ctx.ref.k$kmer.log");
 }
 
 # Gets the total sequence length of a multi-fasta file
@@ -410,7 +405,6 @@ else
    # Thread to error correct reads
    # Note this returns location of corrected reads
    my $quake_thread = threads->create(\&quake_error_correct, $reads);
-
    # Thread to prepare reference with cortex and stampy
    my $reference_thread = threads->create(\&prepare_reference, $assembly_file);
 
@@ -423,7 +417,7 @@ else
    my $cortex_command = "perl $cortex_wrapper --first_kmer $first_kmer --last_kmer $last_kmer --kmer_step $kmer_step --fastaq_index $index_name --auto_cleaning $auto_cleaning --bc $bc --pd $pd --outdir $out_dir --outvcf $output_prefix --ploidy $ploidy --refbindir $ref_bin_dir --list_ref_fasta $ref_se --stampy_hash REF --stampy_bin $stampy_location --genome_size $approx_length --mem_height $mem_height --mem_width $mem_width --squeeze_mem --vcftools_dir $old_vcftools_location --do_union $do_union --ref $ref_usage --workflow $workflow --logfile $ctx_logfile --apply_pop_classifier";
 
    print STDERR "Running cortex\n";
-   system("$cortex_command 2>&1 > cortex.err");
+   system("$cortex_command &> cortex.err");
 
    # Output expected coverage for each variant type
 
