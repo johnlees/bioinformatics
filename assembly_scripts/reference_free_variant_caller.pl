@@ -167,7 +167,7 @@ sub parse_read_file($)
    # Parses the read file names and sample names from the input read file.
    # Returns reference to an array of sample names, and a hash of read
    # locations.
-   my $read_file = @_;
+   my ($read_file) = @_;
 
    open(READS, $read_file) || die("Could not open $read_file: $!\n");
    my %read_locations;
@@ -200,7 +200,7 @@ sub parse_read_file($)
 
 sub decompress_fastq($)
 {
-   my $fastq = @_;
+   my ($fastq) = @_;
    my $decompressed_location;
    my $cwd = getcwd();
 
@@ -217,7 +217,7 @@ sub decompress_fastq($)
 # Error corrects fastq files using quake
 sub quake_error_correct($)
 {
-   my $reads = @_;
+   my ($reads) = @_;
    my %corrected_reads;
 
    # Prepare a file with the locations of the fastq file pairs for input to
@@ -263,7 +263,7 @@ sub quake_error_correct($)
 # Creates binaries and a stampy hash of a reference sequence
 sub prepare_reference($)
 {
-   my $reference_file = @_;
+   my ($reference_file) = @_;
 
    my @cortex_threads;
 
@@ -329,7 +329,7 @@ sub build_binary($$$)
 # Gets the total sequence length of a multi-fasta file
 sub reference_length($)
 {
-   my $reference_file = @_;
+   my ($reference_file) = @_;
 
    my $length = `grep -v ">" $reference_file | wc -m`;
 
@@ -341,7 +341,7 @@ sub create_cortex_index($)
 {
    # A reference to a hash of read locations
    # %$reads{sample}{direction}
-   my $reads = @_;
+   my ($reads) = @_;
 
    my $index_name = "INDEX";
 
