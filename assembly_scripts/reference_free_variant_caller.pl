@@ -229,31 +229,38 @@ sub decompress_fastq($)
 sub quake_error_correct($)
 {
    my ($reads) = @_;
-   my %corrected_reads;
+   my (%corrected_reads, %quake_symlinks);
+
+   mkdir "quake" || die("Could not create quake directory: $!\n");
 
    # Prepare a file with the locations of the fastq file pairs for input to
    # quake
    my $quake_input_file_name = "quake_reads.txt";
-   open (QUAKE, ">$quake_input_file_name") || die("Could not open $quake_input_file_name for writing: $!");
+   open (QUAKE, ">quake/$quake_input_file_name") || die("Could not open $quake_input_file_name for writing: $!");
 
+   # Quake outputs where the read files originally were, which isn't
+   # necessarily writable. Create symlinks instead
+   my $cwd = getcwd();
    foreach my $sample (keys %$reads)
    {
-      my $forward_read = $$reads{$sample}{"forward"};
-      my $backward_read = $$reads{$sample}{"backward"};
+      foreach my $direction (keys %{$$reads{$sample}})
+      {
+         my $read_location = $$reads{$sample}{$direction};
+         my ($volume ,$directories, $file) = File::Spec->splitpath($read_location);
 
-      print QUAKE join(" ", $forward_read, $backward_read) . "\n";
+         $quake_symlinks{$sample}{$direction} = $cwd . "/quake/$file";
+         symlink $read_location, $quake_symlinks{$sample}{$direction};
+      }
+      print QUAKE join(" ", $quake_symlinks{$sample}{"forward"} , $quake_symlinks{$sample}{"backward"}) . "\n";
    }
 
    close QUAKE;
 
    # Run quake
-   mkdir "quake" || die("Could not create quake directory: $!\n");
-
-   my $quake_command = "cd quake && $quake_location -f ../$quake_input_file_name -k $quake_kmer_size -p $quake_threads &> quake.log";
+   my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $quake_kmer_size -p $quake_threads &> quake.log";
    system($quake_command);
 
    # Set paths of corrected reads
-   my $cwd = getcwd();
    foreach my $sample (keys %$reads)
    {
       foreach my $read_direction (keys %{$$reads{$sample}})
@@ -289,10 +296,10 @@ sub prepare_reference($)
 
    # Make a stampy hash of the reference
    my $stampy_command = "$stampy_location -G REF $reference_file";
-   system("$stampy_command &> stampy.G.log");
+   system("$stampy_command &> stampy.genome.log");
 
    $stampy_command = "$stampy_location -g REF -H REF";
-   system("$stampy_command &> stampy.gH.log");
+   system("$stampy_command &> stampy.hash.log");
 
    # Wait for cortex jobs to finish
    foreach my $thread (@cortex_threads)
@@ -337,6 +344,7 @@ sub reference_length($)
    my ($reference_file) = @_;
 
    my $length = `grep -v ">" $reference_file | wc -m`;
+   chomp($length);
 
    return($length);
 }
@@ -363,8 +371,8 @@ sub create_cortex_index($)
       open(PE_F, ">$pe_1") || die("Could not open $pe_1 for writing: $!\n");
       open(PE_R, ">$pe_2") || die("Could not open $pe_2 for writing: $!\n");
 
-      print PE_F $$reads{$sample}{"forward"};
-      print PE_R $$reads{$sample}{"backward"};
+      print PE_F $$reads{$sample}{"forward"} . "\n";
+      print PE_R $$reads{$sample}{"backward"}. "\n";
 
       close PE_F;
       close PE_R;
@@ -427,6 +435,7 @@ else
    my $cortex_command = "perl $cortex_wrapper --first_kmer $first_kmer --last_kmer $last_kmer --kmer_step $kmer_step --fastaq_index $index_name --auto_cleaning $auto_cleaning --bc $bc --pd $pd --outdir $out_dir --outvcf $output_prefix --ploidy $ploidy --refbindir $ref_bin_dir --list_ref_fasta $ref_se --stampy_hash REF --stampy_bin $stampy_location --genome_size $approx_length --mem_height $mem_height --mem_width $mem_width --squeeze_mem --vcftools_dir $old_vcftools_location --do_union $do_union --ref $ref_usage --workflow $workflow --logfile $ctx_logfile --apply_pop_classifier";
 
    print STDERR "Running cortex\n";
+   print STDERR "$cortex_command\n\n";
    system("$cortex_command &> cortex.err");
 
    # Output expected coverage for each variant type
@@ -439,7 +448,7 @@ else
    print STDERR "Fixing and annotating vcf\n";
 
    # Reheader vcf with bcftools as pop filter FILTER fields not included (bug in cortex)
-   system("$vcf_to_gff::bcftools_location view -h $output_vcf > vcf_header.tmp");
+   system($vcf_to_gff::bcftools_location . " view -h $output_vcf > vcf_header.tmp");
    system("head -n -1 vcf_header.tmp > vcf_header_reduced.tmp");
    system("tail -1 vcf_header.tmp > vcf_column_headings.tmp");
 
@@ -448,7 +457,7 @@ else
    close FILTERS;
 
    system("cat vcf_header_reduced.tmp filters.tmp vcf_column_headings.tmp > new_header.tmp");
-   system("$vcf_to_gff::bcftools_location reheader -h new_header.tmp $output_vcf -o $output_vcf");
+   system($vcf_to_gff::bcftools_location . " reheader -h new_header.tmp $output_vcf -o $output_vcf");
    unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filter.tmp", "new_header.tmp";
 
    # Fix error in filter fields introduced by population filter fields, then
@@ -458,13 +467,13 @@ else
 
    system("sed -i -e 's/,PF/;PF/g' $output_vcf");
    system("bgzip -c $output_vcf > $fixed_vcf");
-   system("$vcf_to_gff::bcftools_location index $fixed_vcf");
+   system($vcf_to_gff::bcftools_location . " index $fixed_vcf");
 
    # Annotate vcf, and extract passed variant sites only
    vcf_to_gff::transfer_annotation($annotation_file, $fixed_vcf);
 
-   system("$vcf_to_gff::bcftools_location view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
-   system("$vcf_to_gff::bcftools_location index $filtered_vcf");
+   system($vcf_to_gff::bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
+   system($vcf_to_gff::bcftools_location . " index $filtered_vcf");
 
    print STDERR "Final output:\n$filtered_vcf\n";
 }
