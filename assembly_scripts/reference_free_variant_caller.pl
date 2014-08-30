@@ -47,13 +47,14 @@ use File::Basename;
 use lib dirname( abs_path $0 );
 
 use vcf_to_gff;
+use quake_wrapper;
 
 # Global locations of software needed
 my $old_vcftools_location =  "/nfs/users/nfs_j/jl11/installations/vcftools_0.1.12a";
-my $quake_location = "/nfs/users/nfs_j/jl11/software/bin/quake/quake.py";
 my $cortex_wrapper = "/nfs/users/nfs_j/jl11/installations/CORTEX_release_v1.0.5.21/scripts/calling/run_calls.pl";
 my $cortex_binaries = "/nfs/users/nfs_j/jl11/installations/CORTEX_release_v1.0.5.21/bin";
 my $stampy_location = "/nfs/users/nfs_j/jl11/installations/stampy-1.0.23/stampy.py";
+my $bcftools_location = "/nfs/users/nfs_j/jl11/software/bin/bcftools";
 
 my @required_binaries = ("cortex_var_31_c1", "cortex_var_63_c2");
 
@@ -161,117 +162,6 @@ sub check_binaries()
    }
 
    return($missing);
-}
-
-sub parse_read_file($)
-{
-   # Parses the read file names and sample names from the input read file.
-   # Returns reference to an array of sample names, and a hash of read
-   # locations.
-   my ($read_file) = @_;
-
-   my (%read_locations, %decompress);
-   my @sample_names;
-   open(READS, $read_file) || die("Could not open $read_file: $!\n");
-
-   while (my $read_pair = <READS>)
-   {
-      chomp($read_pair);
-      my ($sample_name, $forward_read, $backward_read) = split("\t", $read_pair);
-      push(@sample_names, $sample_name);
-
-      # Decompress reads if needed, spawing a thread to do so
-      if ($forward_read =~ /\.gz$/)
-      {
-         $decompress{$sample_name}{"forward"} = threads->create(\&decompress_fastq, $forward_read);
-      }
-      if ($backward_read =~ /\.gz$/)
-      {
-         $decompress{$sample_name}{"backward"} = threads->create(\&decompress_fastq, $backward_read);
-      }
-
-      # Store in hash of hashes
-      $read_locations{$sample_name}{"forward"} = $forward_read;
-      $read_locations{$sample_name}{"backward"} = $backward_read;
-   }
-
-   # Wait for all decompression threads to complete, and overwrite read
-   # locations with new fastq paths
-   foreach my $sample (keys %decompress)
-   {
-      foreach my $direction (keys %{$decompress{$sample}})
-      {
-         $read_locations{$sample}{$direction} = $decompress{$sample}{$direction}->join();
-      }
-   }
-
-   close READS;
-   return(\@sample_names, \%read_locations);
-}
-
-sub decompress_fastq($)
-{
-   my ($fastq) = @_;
-   my $decompressed_location;
-   my $cwd = getcwd();
-
-   print STDERR "Decompressing $fastq\n";
-   my ($volume ,$directories, $file) = File::Spec->splitpath($fastq);
-
-   $file =~ m/^(.+\.fastq)\.gz/;
-   $decompressed_location = "$cwd/$1";
-   system("gzip -d -c $fastq > $decompressed_location");
-
-   return($decompressed_location);
-}
-
-# Error corrects fastq files using quake
-sub quake_error_correct($)
-{
-   my ($reads) = @_;
-   my (%corrected_reads, %quake_symlinks);
-
-   mkdir "quake" || die("Could not create quake directory: $!\n");
-
-   # Prepare a file with the locations of the fastq file pairs for input to
-   # quake
-   my $quake_input_file_name = "quake_reads.txt";
-   open (QUAKE, ">quake/$quake_input_file_name") || die("Could not open $quake_input_file_name for writing: $!");
-
-   # Quake outputs where the read files originally were, which isn't
-   # necessarily writable. Create symlinks instead
-   my $cwd = getcwd();
-   foreach my $sample (keys %$reads)
-   {
-      foreach my $direction (keys %{$$reads{$sample}})
-      {
-         my $read_location = $$reads{$sample}{$direction};
-         my ($volume ,$directories, $file) = File::Spec->splitpath($read_location);
-
-         $quake_symlinks{$sample}{$direction} = $cwd . "/quake/$file";
-         symlink $read_location, $quake_symlinks{$sample}{$direction};
-      }
-      print QUAKE join(" ", $quake_symlinks{$sample}{"forward"} , $quake_symlinks{$sample}{"backward"}) . "\n";
-   }
-
-   close QUAKE;
-
-   # Run quake
-   my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $quake_kmer_size -p $quake_threads &> quake.log";
-   system($quake_command);
-
-   # Set paths of corrected reads
-   foreach my $sample (keys %$reads)
-   {
-      foreach my $read_direction (keys %{$$reads{$sample}})
-      {
-         my ($volume ,$directories, $file) = File::Spec->splitpath($$reads{$sample}{$read_direction});
-         $file =~ m/^(.+)\.fastq$/;
-         $corrected_reads{$sample}{$read_direction} = "$cwd/quake/$1.cor.fastq";
-      }
-   }
-
-   return(\%corrected_reads);
 }
 
 # Creates binaries and a stampy hash of a reference sequence
@@ -416,13 +306,13 @@ elsif (check_binaries())
 else
 {
    my $cwd = getcwd();
-   my ($samples, $reads) = parse_read_file($read_file);
+   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file);
 
    print STDERR "Error correcting reads and preparing assembly\n";
 
    # Thread to error correct reads
    # Note this returns location of corrected reads
-   my $quake_thread = threads->create(\&quake_error_correct, $reads);
+   my $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
    # Thread to prepare reference with cortex and stampy
    my $reference_thread = threads->create(\&prepare_reference, $assembly_file);
 
@@ -448,7 +338,7 @@ else
    print STDERR "Fixing and annotating vcf\n";
 
    # Reheader vcf with bcftools as pop filter FILTER fields not included (bug in cortex)
-   system($vcf_to_gff::bcftools_location . " view -h $output_vcf > vcf_header.tmp");
+   system($bcftools_location . " view -h $output_vcf > vcf_header.tmp");
    system("head -n -1 vcf_header.tmp > vcf_header_reduced.tmp");
    system("tail -1 vcf_header.tmp > vcf_column_headings.tmp");
 
@@ -457,7 +347,7 @@ else
    close FILTERS;
 
    system("cat vcf_header_reduced.tmp filters.tmp vcf_column_headings.tmp > new_header.tmp");
-   system($vcf_to_gff::bcftools_location . " reheader -h new_header.tmp $output_vcf -o $output_vcf");
+   system($bcftools_location . " reheader -h new_header.tmp $output_vcf -o $output_vcf");
    unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filter.tmp", "new_header.tmp";
 
    # Fix error in filter fields introduced by population filter fields, then
@@ -467,13 +357,13 @@ else
 
    system("sed -i -e 's/,PF/;PF/g' $output_vcf");
    system("bgzip -c $output_vcf > $fixed_vcf");
-   system($vcf_to_gff::bcftools_location . " index $fixed_vcf");
+   system($bcftools_location . " index $fixed_vcf");
 
    # Annotate vcf, and extract passed variant sites only
    vcf_to_gff::transfer_annotation($annotation_file, $fixed_vcf);
 
-   system($vcf_to_gff::bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
-   system($vcf_to_gff::bcftools_location . " index $filtered_vcf");
+   system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
+   system($bcftools_location . " index $filtered_vcf");
 
    print STDERR "Final output:\n$filtered_vcf\n";
 }

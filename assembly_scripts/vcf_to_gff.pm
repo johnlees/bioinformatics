@@ -12,7 +12,7 @@ my $tmp_annotation = "annotation.tmp";
 my $annotation_header_file = "annotation_headers.tmp";
 
 # Global locations of software needed
-our $bcftools = "/nfs/users/nfs_j/jl11/software/bin/bcftools";
+my $bcftools = "/nfs/users/nfs_j/jl11/software/bin/bcftools";
 
 # Headers for bcftools annotation
 my $annotation_headers = <<HEADER;
