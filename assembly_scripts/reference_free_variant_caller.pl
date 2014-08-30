@@ -48,6 +48,7 @@ use lib dirname( abs_path $0 );
 
 use vcf_to_gff;
 use quake_wrapper;
+use assembly_common;
 
 # Global locations of software needed
 my $old_vcftools_location =  "/nfs/users/nfs_j/jl11/installations/vcftools_0.1.12a";
@@ -328,12 +329,20 @@ else
    print STDERR "$cortex_command\n\n";
    system("$cortex_command &> cortex.err");
 
-   # Output expected coverage for each variant type
+   # Output expected coverage for each variant type, but use correct
+   # coverage and read length
+   my $coverage_fastq = $$reads{$$samples[0]}{"forward"};
+   my $read_length = assembly_common::read_length($coverage_fastq);
+   my $expected_coverage = assembly_common::expected_coverage($coverage_fastq, $approx_length);
+   print STDERR "Using reads in $coverage_fastq for expected coverage calculations\n";
+
+   print "Effective coverage at k=$first_kmer: " . assembly_common::effective_coverage($first_kmer, $read_length, $expected_coverage) . "\n";
+   print "Effective coverage at k=$last_kmer: " . assembly_common::effective_coverage($last_kmer, $read_length, $expected_coverage) . "\n";
 
    # Fix vcf output
    # TODO: This isn't ideal as some of the name is hard coded when it can be inferred
    # from the run_calls.pl parameters
-   my $output_vcf = "$cwd/$out_dir/vcfs/$output_prefix" . "_wk_flow_J_Ref_CO_FINALcombined_BC_calls_at_all_k.decomp.vcf";
+   my $output_vcf = "$cwd/$out_dir/vcfs/$output_prefix" . "_wk_flow_J_RefCO_FINALcombined_BC_calls_at_all_k.decomp.vcf";
    print STDERR "Cortex output vcf is: $output_vcf\n\n";
    print STDERR "Fixing and annotating vcf\n";
 
@@ -365,7 +374,7 @@ else
    system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
    system($bcftools_location . " index $filtered_vcf");
 
-   print STDERR "Final output:\n$filtered_vcf\n";
+   print "Final output:\n$filtered_vcf\n";
 }
 
 exit(0);
