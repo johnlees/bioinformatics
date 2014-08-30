@@ -7,6 +7,7 @@ use warnings;
 
 use threads;
 use File::Spec;
+use Cwd;
 
 my $quake_location = "/nfs/users/nfs_j/jl11/software/bin/quake/quake.py";
 

@@ -347,7 +347,7 @@ else
    close FILTERS;
 
    system("cat vcf_header_reduced.tmp filters.tmp vcf_column_headings.tmp > new_header.tmp");
-   system($bcftools_location . " reheader -h new_header.tmp $output_vcf -o $output_vcf");
+   system($bcftools_location . " reheader -h new_header.tmp $output_vcf");
    unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filter.tmp", "new_header.tmp";
 
    # Fix error in filter fields introduced by population filter fields, then
