@@ -20,7 +20,13 @@ use warnings;
 # Returns the effective coverage when reads have been split into kmers
 sub effective_coverage($$$)
 {
-   my ($kmer, $read_length, $expected_coverage);
+   my ($kmer, $read_length, $expected_coverage) = @_;
+
+   if (!defined($read_length) || $read_length <= 0)
+   {
+      print STDERR "WARNING: Invalid read length, assume length of 100 instead\n";
+      $read_length = 100;
+   }
 
    # Formula from cortex supp mat
    my $effective_coverage = (($read_length - $kmer + 1)/$read_length) * $expected_coverage;
@@ -65,6 +71,12 @@ sub expected_coverage($$)
 
    # Get total number of bases sequenced
    my $total_sequenced = number_reads($fastq_file) * read_length($fastq_file);
+
+   if (!defined($genome_size) || $genome_size <= 0)
+   {
+      print STDERR "WARNING: Invalid genome size. Assuming 2Mbases\n";
+      $genome_size = 2000000;
+   }
 
    my $expected_coverage = $total_sequenced/$genome_size;
 

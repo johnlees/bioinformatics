@@ -42,10 +42,12 @@ use Getopt::Long;
 use Cwd;
 use File::Spec;
 
+# Allows use of perl modules in ./
 use Cwd 'abs_path';
 use File::Basename;
 use lib dirname( abs_path $0 );
 
+# Perl modules - assembly
 use vcf_to_gff;
 use quake_wrapper;
 use assembly_common;
