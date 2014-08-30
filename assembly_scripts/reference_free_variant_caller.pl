@@ -334,9 +334,12 @@ else
    # Output expected coverage for each variant type, but use correct
    # coverage and read length
    my $coverage_fastq = $$reads{$$samples[0]}{"forward"};
-   my $read_length = assembly_common::read_length($coverage_fastq);
-   my $expected_coverage = assembly_common::expected_coverage($coverage_fastq, $approx_length);
    print STDERR "Using reads in $coverage_fastq for expected coverage calculations\n";
+
+   # Expected coverage is 2 times this as we've only counted one end of each
+   # read
+   my $read_length = assembly_common::read_length($coverage_fastq);
+   my $expected_coverage = 2*assembly_common::expected_coverage($coverage_fastq, $approx_length);
 
    print "Effective coverage at k=$first_kmer: " . assembly_common::effective_coverage($first_kmer, $read_length, $expected_coverage) . "\n";
    print "Effective coverage at k=$last_kmer: " . assembly_common::effective_coverage($last_kmer, $read_length, $expected_coverage) . "\n";
