@@ -48,7 +48,7 @@ use File::Basename;
 use lib dirname( abs_path $0 );
 
 # Perl modules - assembly
-use vcf_to_gff;
+use gff_to_vcf;
 use quake_wrapper;
 use assembly_common;
 
@@ -84,6 +84,9 @@ my $ref_usage = "CoordinatesOnly";
 my $workflow = "joint";
 my $ctx_logfile = "cortex.bc.log";
 my $ref_se = "REF_se";
+
+# bcftools
+my $bcftools_stderr_file = "bcftools.err";
 
 my $filter_lines = <<'FILTERS';
 ##FILTER=<ID=PF_FAIL_ERROR,Description="Failed population filter">
@@ -175,12 +178,13 @@ sub prepare_reference($)
    my ($reference_file) = @_;
 
    my @cortex_threads;
+   my $ref_new = "reference.renamed.fa";
 
    # Standardise contig names
-   assembly_common::standardise_contig_names($reference_file);
+   assembly_common::standardise_contig_names($reference_file, $ref_new);
 
    # Put assembly.fa location into file for cortex input
-   system("echo $reference_file > $ref_se");
+   system("echo $ref_new > $ref_se");
    mkdir "$ref_bin_dir" || die("Could not make directory $ref_bin_dir: $!\n");
 
    # Dump a binary for each kmer being used
@@ -193,7 +197,7 @@ sub prepare_reference($)
    }
 
    # Make a stampy hash of the reference
-   my $stampy_command = "$stampy_location -G REF $reference_file";
+   my $stampy_command = "$stampy_location -G REF $ref_new";
    system("$stampy_command &> stampy.genome.log");
 
    $stampy_command = "$stampy_location -g REF -H REF";
@@ -204,6 +208,9 @@ sub prepare_reference($)
    {
       $thread->join();
    }
+
+   # Give new reference name
+   return($ref_new);
 
 }
 
@@ -317,21 +324,24 @@ else
    my $cwd = getcwd();
    my ($samples, $reads) = quake_wrapper::parse_read_file($read_file);
 
-   print STDERR "Error correcting reads and preparing assembly\n";
-
    # Thread to error correct reads
    # Note this returns location of corrected reads
    my $quake_thread;
    unless ($no_quake)
    {
+      print STDERR "Error correcting reads and preparing assembly\n";
       $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
+   }
+   else
+   {
+      print STDERR "Preparaing assembly\n";
    }
 
    # Thread to prepare reference with cortex and stampy
    my $reference_thread = threads->create(\&prepare_reference, $assembly_file);
 
    # Run cortex once threads have finished
-   $reference_thread->join();
+   $assembly_file = $reference_thread->join();
 
    my $index_name;
    if ($no_quake)
@@ -375,7 +385,7 @@ else
    my $fixed_vcf = "$cwd/$output_prefix.decomposed_calls.vcf";
    my $filtered_vcf = "$cwd/$output_prefix.filtered_calls.vcf.gz";
 
-   system($bcftools_location . " view -h $output_vcf > vcf_header.tmp");
+   system($bcftools_location . " view -h $output_vcf > vcf_header.tmp 2> $bcftools_stderr_file");
    system("head -n -1 vcf_header.tmp > vcf_header_reduced.tmp");
    system("tail -1 vcf_header.tmp > vcf_column_headings.tmp");
 
@@ -384,20 +394,20 @@ else
    close FILTERS;
 
    system("cat vcf_header_reduced.tmp filters.tmp vcf_column_headings.tmp > new_header.tmp");
-   system($bcftools_location . " reheader -h new_header.tmp $output_vcf > $fixed_vcf");
+   system($bcftools_location . " reheader -h new_header.tmp $output_vcf > $fixed_vcf 2>> $bcftools_stderr_file");
    unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filters.tmp", "new_header.tmp";
 
    # Fix error in filter fields introduced by population filter fields, then
    # bgzip and index
    system("sed -i -e 's/,PF/;PF/g' $fixed_vcf");
    system("bgzip $fixed_vcf");
-   system($bcftools_location . " index $fixed_vcf.gz");
+   system($bcftools_location . " index $fixed_vcf.gz 2>> $bcftools_stderr_file");
 
    # Annotate vcf, and extract passed variant sites only
    vcf_to_gff::transfer_annotation($annotation_file, "$fixed_vcf.gz");
 
-   system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
-   system($bcftools_location . " index $filtered_vcf");
+   system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
+   system($bcftools_location . " index $filtered_vcf 2>> $bcftools_stderr_file");
 
    print "Final output:\n$filtered_vcf\n";
 }

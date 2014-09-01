@@ -13,6 +13,8 @@ my $annotation_header_file = "annotation_headers.tmp";
 
 # Global locations of software needed
 my $bcftools = "/nfs/users/nfs_j/jl11/software/bin/bcftools";
+my $tabix_location = "/usr/bin/tabix"; # Must be <v1.0!
+my $bgzip_location = "bgzip";
 
 # Headers for bcftools annotation
 my $annotation_headers = <<HEADER;
@@ -24,6 +26,8 @@ HEADER
 sub transfer_annotation($$)
 {
    my ($annotations, $vcf_file) = @_;
+
+   my $stderr_file = "bcf_annotate.err";
 
    # Open gff with bioperl, ignoring sequence at the bottom
    # EDIT: Ignoring sequence seems to cause loop to hang, so include it for now
@@ -74,15 +78,15 @@ sub transfer_annotation($$)
    close HEADERS;
 
    # bgzip and tabix annotations file
-   system("bgzip $tmp_annotation");
-   system("tabix -s 1 -b 2 -e 3 $tmp_annotation.gz");
+   system("$bgzip_location $tmp_annotation");
+   system("$tabix_location -s 1 -b 2 -e 3 $tmp_annotation.gz");
 
    # Also annotate allele counts at the same time
-   my $bcftools_command = "$bcftools annotate -p fill-AN-AC -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file -O z $vcf_file";
+   my $bcftools_command = "$bcftools annotate -p fill-AN-AC -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file -O z $vcf_file 2> $stderr_file";
    system($bcftools_command);
 
    # Need to refresh index
-   system("$bcftools index -f $vcf_file");
+   system("$bcftools index -f $vcf_file 2>> $stderr_file");
 
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;

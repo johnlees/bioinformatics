@@ -86,9 +86,10 @@ sub expected_coverage($$)
 }
 
 # Renames contigs from the assembly pipeline to match the annotation pipeline
-sub standardise_contig_names($)
+# Overwrites file in place if new file name not provided
+sub standardise_contig_names($$)
 {
-   my ($contigs_file) = @_;
+   my ($contigs_file, $new_file) = @_;
 
    my $tmp_file = "tmp_contigs_rename.tmp";
 
@@ -97,20 +98,38 @@ sub standardise_contig_names($)
       die("Contigs file $contigs_file doesn't exist or can't be read: $!\n");
    }
 
+   # Open multi-fasta objects
    my $multi_fasta = Bio::SeqIO->new(-file => $contigs_file, -format => 'fasta') || die("Failed to open $contigs_file: $!\n");
-   my $renamed_out = Bio::SeqIO->new(-file => ">$tmp_file", -format => 'fasta') || die("Couldn't write to $tmp_file: $!\n");
+   my $renamed_out;
+
+   if(!defined($new_file))
+   {
+      $renamed_out = Bio::SeqIO->new(-file => ">$tmp_file", -format => 'fasta') || die("Couldn't write to $tmp_file: $!\n");
+   }
+   else
+   {
+      $renamed_out = Bio::SeqIO->new(-file => ">$new_file", -format => 'fasta') || die("Couldn't write to $tmp_file: $!\n");
+   }
 
    while (my $sequence = $multi_fasta->next_seq())
    {
+      # Contigs are named .run_lane_tag_contig
+      # Rename as contig000001 (uses 6 spaces, so 2 digit contig numbers have
+      # 4 zeros rather than 5 - hence use sprintf)
       $sequence->display_id =~ m/^\.\d+_\d+_\d+\.(\d+)$/;
       my $new_id = "contig" . sprintf("%06d", $1);
 
+      # Write new name to tmp file
       $sequence->display_id($new_id);
       $renamed_out->write_seq($sequence);
    }
 
-   rename $tmp_file, $contigs_file;
-   unlink $tmp_file;
+   # Overwrite original if necessary
+   if (!defined($new_file))
+   {
+      rename $tmp_file, $contigs_file;
+      unlink $tmp_file;
+   }
 }
 
 1;
