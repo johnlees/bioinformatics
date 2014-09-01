@@ -82,7 +82,7 @@ sub transfer_annotation($$)
    system($bcftools_command);
 
    # Need to refresh index
-   system("$bcftools index $vcf_file");
+   system("$bcftools index -f $vcf_file");
 
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;

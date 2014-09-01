@@ -5,6 +5,8 @@ package assembly_common;
 use strict;
 use warnings;
 
+use Bio::SeqIO;
+
 #
 # Functions common to scripts dealing with assemblies and fastq files
 #
@@ -81,6 +83,34 @@ sub expected_coverage($$)
    my $expected_coverage = $total_sequenced/$genome_size;
 
    return($expected_coverage);
+}
+
+# Renames contigs from the assembly pipeline to match the annotation pipeline
+sub standardise_contig_names($)
+{
+   my ($contigs_file) = @_;
+
+   my $tmp_file = "tmp_contigs_rename.tmp";
+
+   if(!defined($contigs_file) || !-e($contigs_file))
+   {
+      die("Contigs file $contigs_file doesn't exist or can't be read: $!\n");
+   }
+
+   my $multi_fasta = Bio::SeqIO->new(-file => $contigs_file, -format => 'fasta') || die("Failed to open $contigs_file: $!\n");
+   my $renamed_out = Bio::SeqIO->new(-file => ">$tmp_file", -format => 'fasta') || die("Couldn't write to $tmp_file: $!\n");
+
+   while (my $sequence = $multi_fasta->next_seq())
+   {
+      $sequence->display_id =~ m/^\.\d+_\d+_\d+\.(\d+)$/;
+      my $new_id = "contig" . sprintf("%06d", $1);
+
+      $sequence->display_id($new_id);
+      $renamed_out->write_seq($sequence);
+   }
+
+   rename $tmp_file, $contigs_file;
+   unlink $tmp_file;
 }
 
 1;

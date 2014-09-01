@@ -100,15 +100,17 @@ Uses cortex_var to call variants between two samples without providing a referen
 sequence
 
    Options
-   -a, --assembly    Contigs of a de-novo assembly of one of the samples in
-                     multi-fasta format. See help for more info.
-   -g, --annotation  Annotation of the -a assembly in gff v3.
-   -r, --reads       Tab delimited file of fastq or fastq.gz file locations.
-                     One line per sample. First column sample name, second
-                     column forward reads, third column reverse reads.
-                     It is best to give absolute paths
-   -o, --output      Prefix for output vcfs
-   -h, --help        Shows more detailed help.
+   -a, --assembly      Contigs of a de-novo assembly of one of the samples in
+                       multi-fasta format. See help for more info.
+   -g, --annotation    Annotation of the -a assembly in gff v3.
+   -r, --reads         Tab delimited file of fastq or fastq.gz file locations.
+                       One line per sample. First column sample name, second
+                       column forward reads, third column reverse reads.
+                       It is best to give absolute paths
+   --no-error-correct  Don't run quake on reads. Input reads are fed directly
+                       into cortex
+   -o, --output        Prefix for output vcfs
+   -h, --help          Shows more detailed help.
 
 Requires: cortex_var, bcftools, quake and jellyfish. See help for more details
 USAGE
@@ -173,6 +175,9 @@ sub prepare_reference($)
    my ($reference_file) = @_;
 
    my @cortex_threads;
+
+   # Standardise contig names
+   assembly_common::standardise_contig_names($reference_file);
 
    # Put assembly.fa location into file for cortex input
    system("echo $reference_file > $ref_se");
@@ -280,10 +285,11 @@ sub create_cortex_index($)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($assembly_file, $annotation_file, $read_file, $output_prefix, $help);
+my ($assembly_file, $annotation_file, $read_file, $no_quake, $output_prefix, $help);
 GetOptions ("assembly|a=s"  => \$assembly_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
+            "no-error-correct" => \$no_quake,
             "output|o=s"  => \$output_prefix,
             "help|h"     => \$help
 		   ) or die($usage_message);
@@ -315,13 +321,27 @@ else
 
    # Thread to error correct reads
    # Note this returns location of corrected reads
-   my $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
+   my $quake_thread;
+   unless ($no_quake)
+   {
+      $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
+   }
+
    # Thread to prepare reference with cortex and stampy
    my $reference_thread = threads->create(\&prepare_reference, $assembly_file);
 
    # Run cortex once threads have finished
    $reference_thread->join();
-   my $index_name = create_cortex_index($quake_thread->join());
+
+   my $index_name;
+   if ($no_quake)
+   {
+      $index_name = create_cortex_index($reads);
+   }
+   else
+   {
+      $index_name = create_cortex_index($quake_thread->join());
+   }
 
    my $approx_length = reference_length($assembly_file);
 
@@ -352,6 +372,9 @@ else
    print STDERR "Fixing and annotating vcf\n";
 
    # Reheader vcf with bcftools as pop filter FILTER fields not included (bug in cortex)
+   my $fixed_vcf = "$cwd/$output_prefix.decomposed_calls.vcf";
+   my $filtered_vcf = "$cwd/$output_prefix.filtered_calls.vcf.gz";
+
    system($bcftools_location . " view -h $output_vcf > vcf_header.tmp");
    system("head -n -1 vcf_header.tmp > vcf_header_reduced.tmp");
    system("tail -1 vcf_header.tmp > vcf_column_headings.tmp");
@@ -361,20 +384,17 @@ else
    close FILTERS;
 
    system("cat vcf_header_reduced.tmp filters.tmp vcf_column_headings.tmp > new_header.tmp");
-   system($bcftools_location . " reheader -h new_header.tmp $output_vcf");
-   unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filter.tmp", "new_header.tmp";
+   system($bcftools_location . " reheader -h new_header.tmp $output_vcf > $fixed_vcf");
+   unlink "vcf_header.tmp", "vcf_header_reduced.tmp", "vcf_column_headings.tmp", "filters.tmp", "new_header.tmp";
 
    # Fix error in filter fields introduced by population filter fields, then
    # bgzip and index
-   my $fixed_vcf = "$cwd/$output_prefix.decomposed_calls.vcf.gz";
-   my $filtered_vcf = "$cwd/$output_prefix.filtered_calls.vcf.gz";
-
-   system("sed -i -e 's/,PF/;PF/g' $output_vcf");
-   system("bgzip -c $output_vcf > $fixed_vcf");
-   system($bcftools_location . " index $fixed_vcf");
+   system("sed -i -e 's/,PF/;PF/g' $fixed_vcf");
+   system("bgzip $fixed_vcf");
+   system($bcftools_location . " index $fixed_vcf.gz");
 
    # Annotate vcf, and extract passed variant sites only
-   vcf_to_gff::transfer_annotation($annotation_file, $fixed_vcf);
+   vcf_to_gff::transfer_annotation($annotation_file, "$fixed_vcf.gz");
 
    system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z");
    system($bcftools_location . " index $filtered_vcf");
