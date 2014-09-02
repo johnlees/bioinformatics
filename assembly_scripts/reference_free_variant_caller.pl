@@ -363,6 +363,10 @@ else
 
    # Output expected coverage for each variant type, but use correct
    # coverage and read length
+   #
+   # TODO: This assumes no further cleaning by cortex. It might be best either
+   # just to take cortex's calculated value, or input the quality threhold to
+   # quake rather than cortex
    my $coverage_fastq = $$reads{$$samples[0]}{"forward"};
    print STDERR "Using reads in $coverage_fastq for expected coverage calculations\n";
 
