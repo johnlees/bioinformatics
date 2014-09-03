@@ -8,7 +8,7 @@ use Getopt::Long;
 use assembly_common;
 
 my $help_message = <<HELP;
-Usage: ./mutate_fast.pl -f <fasta_file> -r <mutation_rate> -o <output_file> (-s <seed>)
+Usage: ./mutate_fast.pl -f <fasta_file> -r <mutation_rate> -o <output_file> (-s <seed>) > mutations.txt
 
 Creates SNPs in a multifasta using JC69 rate matrix
 Options:
@@ -18,6 +18,8 @@ Options:
    -o --output   Output file name
 
    -h --help     This help message
+
+Prints mutations tab separated to stdout and logs to stderr
 HELP
 
 my $total_mutations;
@@ -76,7 +78,7 @@ else
    }
 
    # Give total number of mutations actually made
-   print "$total_mutations mutations produced\n";
+   print STDERR "$total_mutations mutations produced\n";
 
    # Done
    print STDERR "\nDone\n";

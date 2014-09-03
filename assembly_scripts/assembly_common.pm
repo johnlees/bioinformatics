@@ -148,7 +148,7 @@ sub create_snps($$$)
    my $sequence_length = length($sequence);
 
    my $num_mutations = $sequence_length * $rate;
-   print "Seq length: $sequence_length expected mutations: $num_mutations\n";
+   print STDERR "Seq length: $sequence_length expected mutations: $num_mutations\n";
 
    # Use the seed passed if it exists to allow replication of results
    if (defined($seed))
