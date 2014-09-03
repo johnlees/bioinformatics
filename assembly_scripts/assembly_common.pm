@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use Bio::SeqIO;
+use POSIX;
 
 #
 # Functions common to scripts dealing with assemblies and fastq files
@@ -130,6 +131,55 @@ sub standardise_contig_names($$)
       rename $tmp_file, $contigs_file;
       unlink $tmp_file;
    }
+}
+
+# Takes a sequence as a string, and changes some letters to create SNPs
+# Mutation rate is indepenedent of context, and the same rate between all bases
+# i.e. JC69 model
+#
+# Returns sequence and an array (reference) of mutations and locations
+sub create_snps($$$)
+{
+   my ($sequence, $rate, $seed) = @_;
+
+   my @alphabet = ("a", "c", "t", "g");
+   my @mutations;
+
+   my $sequence_length = length($sequence);
+
+   my $num_mutations = $sequence_length * $rate;
+   print "Seq length: $sequence_length expected mutations: $num_mutations\n";
+
+   # Use the seed passed if it exists to allow replication of results
+   if (defined($seed))
+   {
+      srand($seed);
+   }
+
+   for (my $i = 0; $i< $sequence_length; $i++)
+   {
+      if (rand($sequence_length) <= $num_mutations)
+      {
+         # Randomly pick a new base ~ U(0-3)
+         my $random_num = floor(rand(4));
+         if ($random_num == 4)
+         {
+            $random_num = 3;
+         }
+
+         my $new_base = $alphabet[$random_num];
+         my $base = substr($sequence, $i, 1, $new_base);
+
+         # May be the same as old base, but if not record the mutation
+         unless ($new_base eq $base)
+         {
+            push(@mutations, $i+1 . ": $base" . "->$new_base");
+         }
+
+      }
+   }
+
+   return($sequence, \@mutations);
 }
 
 1;
