@@ -75,7 +75,8 @@ else
          ($new_seq, $mutations) = assembly_common::create_snps($seq_string, $mutation_rate, $seed);
       }
 
-      $fasta_out->write_seq($new_seq);
+      $sequence->seq($new_seq);
+      $fasta_out->write_seq($sequence);
 
       # Add mutations to list
       print join("\t", @{$mutations}) . "\n";
