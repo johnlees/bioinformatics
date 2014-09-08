@@ -9,7 +9,7 @@ use Getopt::Long;
 use Cwd 'abs_path';
 use File::Basename;
 use lib dirname( abs_path $0 );
-use lib dirname( abs_path ) . "/assembly_scripts";
+use lib dirname( abs_path $0 ) . "/../assembly_scripts";
 
 use quake_wrapper;
 use gff_to_vcf;
@@ -246,6 +246,8 @@ else
    my $diff_vcf_name = "$output_prefix.diff.vcf.gz";
    system("bcftools view -c $min_ac -C $max_ac -o $diff_vcf_name -O z $output_vcf");
    system("bcftools index $diff_vcf_name");
+
+   # TODO: bcftools stats, plot-vcfstats, bcftools filter
 }
 
 exit(0);
