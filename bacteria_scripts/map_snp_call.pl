@@ -92,6 +92,8 @@ sub sort_sam($)
    {
       mkdir "tmp" || die("Could not make directory tmp: $!\n");
    }
+
+   print STDERR "$sort_command\n";
    system($sort_command);
    unlink $sam_file;
 
