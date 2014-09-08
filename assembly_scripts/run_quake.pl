@@ -59,7 +59,7 @@ else
    # Options ok, run quake
 
    # Get read locations in a hash
-   my($samples, $reads) = quake_wrapper::parse_reads($read_file);
+   my($samples, $reads) = quake_wrapper::parse_read_file($read_file);
 
    # Run quake
    quake_wrapper::quake_error_correct($reads, $kmer_size, $threads);
