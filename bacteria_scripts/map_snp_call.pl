@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use File::Spec;
 
 # Allows use of perl modules in ./
 use Cwd 'abs_path';
@@ -62,8 +63,8 @@ sub run_smalt($$$$)
 {
    my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
 
-   my $output_name = "$sample_name.on.$reference_name.sam";
-   my $log_file = "$sample_name.on.$reference_name.map.log";
+   my $output_name = "$sample_name.mapping.sam";
+   my $log_file = "$sample_name.mapping.log";
 
    my $smalt_command = "smalt map -f samsoft -i $smalt_max_insert -o $output_name $reference_name $forward_reads $reverse_reads &> $log_file";
    system($smalt_command);
@@ -159,11 +160,16 @@ else
    }
 
    # Get array of samples and hash of read locations
-   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 0);
+   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
 
    # Index reference
-   $reference_file =~ m/^(.+)\.fa$/;
+   my ($volume ,$directories, $file) = File::Spec->splitpath($reference_file);
+   $file =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
+
+   symlink $reference_file, "./$ref_name.fa";
+   $reference_file = "./$ref_name.fa";
+
    system("smalt index -k $smalt_k -s $smalt_s $ref_name $reference_file");
 
    # Map read pairs to reference with smalt (output sam files). Use threads
