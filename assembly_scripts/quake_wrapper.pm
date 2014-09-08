@@ -63,9 +63,9 @@ sub quake_error_correct($$$)
 # Parses the read file names and sample names from the input read file.
 # Returns reference to an array of sample names, and a hash of read
 # locations.
-sub parse_read_file($)
+sub parse_read_file($$)
 {
-   my ($read_file) = @_;
+   my ($read_file, $no_decompress) = @_;
 
    my (%read_locations, %decompress);
    my @sample_names;
@@ -78,13 +78,16 @@ sub parse_read_file($)
       push(@sample_names, $sample_name);
 
       # Decompress reads if needed, spawing a thread to do so
-      if ($forward_read =~ /\.gz$/)
+      if (defined($no_decompress) && !$no_decompress)
       {
-         $decompress{$sample_name}{"forward"} = threads->create(\&decompress_fastq, $forward_read);
-      }
-      if ($backward_read =~ /\.gz$/)
-      {
-         $decompress{$sample_name}{"backward"} = threads->create(\&decompress_fastq, $backward_read);
+         if ($forward_read =~ /\.gz$/)
+         {
+            $decompress{$sample_name}{"forward"} = threads->create(\&decompress_fastq, $forward_read);
+         }
+         if ($backward_read =~ /\.gz$/)
+         {
+            $decompress{$sample_name}{"backward"} = threads->create(\&decompress_fastq, $backward_read);
+         }
       }
 
       # Store in hash of hashes

@@ -334,7 +334,7 @@ else
    }
    else
    {
-      print STDERR "Preparaing assembly\n";
+      print STDERR "Preparing assembly\n";
    }
 
    # Thread to prepare reference with cortex and stampy
