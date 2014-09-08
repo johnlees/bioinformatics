@@ -79,8 +79,10 @@ sub sort_sam($)
    my ($sam_file) = @_;
 
    # Set up file names
-   $sam_file =~ m//;
+   my ($volume ,$directories, $file) = File::Spec->splitpath($sam_file);
+   $file =~ m/^(.+)\.sam$/;
    my $file_prefix = $1;
+
    my $bam_file = $file_prefix . ".bam";
 
    # Do sorting and conversion (requires directory for temporary files
@@ -176,7 +178,7 @@ else
    # where possible
    my @sam_files;
 
-   for (my $i=0; $i<=scalar(@$samples); $i+=$threads)
+   for (my $i=0; $i<scalar(@$samples); $i+=$threads)
    {
       my @smalt_threads;
       for (my $thread = 1; $thread <= $threads; $thread++)
@@ -198,7 +200,7 @@ else
 
    # Convert sam to bam, and sort. Again, threading where possible
    my @bam_files;
-   for (my $i=0,; $i<=scalar(@sam_files); $i+=$threads)
+   for (my $i=0,; $i<scalar(@sam_files); $i+=$threads)
    {
       my @sort_threads;
       for (my $thread =1; $thread <= $threads; $threads++)
