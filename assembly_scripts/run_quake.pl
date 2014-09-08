@@ -3,6 +3,11 @@
 use strict;
 use warnings;
 
+# Allows use of perl modules in ./
+use Cwd 'abs_path';
+use File::Basename;
+use lib dirname( abs_path $0 );
+
 use Getopt::Long;
 
 use quake_wrapper;
