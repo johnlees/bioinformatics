@@ -322,7 +322,7 @@ elsif (check_binaries())
 else
 {
    my $cwd = getcwd();
-   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file);
+   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 0);
 
    # Thread to error correct reads
    # Note this returns location of corrected reads
