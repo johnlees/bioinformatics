@@ -52,8 +52,8 @@ sub quake_error_correct($$$)
       foreach my $read_direction (keys %{$$reads{$sample}})
       {
          my ($volume ,$directories, $file) = File::Spec->splitpath($$reads{$sample}{$read_direction});
-         $file =~ m/^(.+)\.fastq$/;
-         $corrected_reads{$sample}{$read_direction} = "$cwd/quake/$1.cor.fastq";
+         $file =~ m/^(.+)\.(fastq|fq)$/;
+         $corrected_reads{$sample}{$read_direction} = "$cwd/quake/$1.cor.$2";
       }
    }
 
