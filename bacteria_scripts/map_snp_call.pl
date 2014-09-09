@@ -172,8 +172,7 @@ else
    my $new_ref = "reference.renamed.fa";
    assembly_common::standardise_contig_names($reference_file, $new_ref);
 
-   my ($volume ,$directories, $file) = File::Spec->splitpath($reference_file);
-   $file =~ m/^(.+)\.(fasta|fa)$/;
+   $new_ref =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
 
    $reference_file = $new_ref;
