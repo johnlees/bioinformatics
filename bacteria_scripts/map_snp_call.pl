@@ -14,6 +14,7 @@ use lib dirname( abs_path $0 ) . "/../assembly_scripts";
 
 use quake_wrapper;
 use gff_to_vcf;
+use assembly_common;
 
 use threads;
 
@@ -118,7 +119,7 @@ sub merge_bams($$$)
       $$bam_files[$i] =~ m/^(.+)\.bam/;
       my $id = $1;
 
-      print RG join("\t", '@RG', "ID:$id", "PL:ILLUMINA", "SM$sample") . "\n";
+      print RG join("\t", '@RG', "ID:$id", "PL:ILLUMINA", "SM:$sample") . "\n";
       $i++;
    }
 
@@ -166,13 +167,16 @@ else
    # Get array of samples and hash of read locations
    my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
 
-   # Index reference
+   # Index reference. Need to rename contigs as in annotation for annotation
+   # transfer to vcf later
+   my $new_ref = "reference.renamed.fa";
+   assembly_common::standardise_contig_names($reference_file, $new_ref);
+
    my ($volume ,$directories, $file) = File::Spec->splitpath($reference_file);
    $file =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
 
-   symlink $reference_file, "./$ref_name.fa";
-   $reference_file = "./$ref_name.fa";
+   $reference_file = $new_ref;
 
    system("smalt index -k $smalt_k -s $smalt_s $ref_name $reference_file");
 
@@ -205,7 +209,7 @@ else
    for (my $i=0,; $i<scalar(@sam_files); $i+=$threads)
    {
       my @sort_threads;
-      for (my $thread =1; $thread <= $threads; $threads++)
+      for (my $thread = 1; $thread <= $threads; $thread++)
       {
          push(@sort_threads, threads->create(\&sort_sam, $sam_files[$i+$thread-1]));
       }
@@ -219,7 +223,7 @@ else
    # Merge bams
    # Sample array is in the same order as bam file name array
    my $merged_bam = "$output_prefix.merged.bam";
-   merge_bams($merged_bam, $samples, \@bam_files);
+   merge_bams($samples, \@bam_files, $merged_bam);
 
    # Call variants, running mpileup and then calling through a pipe
    my $calling_command;
@@ -244,18 +248,18 @@ else
       $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
    }
 
+   print STDERR "$calling_command\n";
    system($calling_command);
 
    # Annotate variants
    vcf_to_gff::transfer_annotation($annotation_file, $output_vcf);
-   system("bcftools index $output_vcf");
 
    # Produced diff only vcf
    my $min_ac = 1;
    my $max_ac = scalar(@$samples) - 1;
    my $diff_vcf_name = "$output_prefix.diff.vcf.gz";
    system("bcftools view -c $min_ac -C $max_ac -o $diff_vcf_name -O z $output_vcf");
-   system("bcftools index $diff_vcf_name");
+   system("bcftools index -f $diff_vcf_name");
 
    # TODO: bcftools stats, plot-vcfstats, bcftools filter
 }
