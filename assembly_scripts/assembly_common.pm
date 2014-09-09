@@ -117,8 +117,18 @@ sub standardise_contig_names($$)
       # Contigs are named .run_lane_tag_contig
       # Rename as contig000001 (uses 6 spaces, so 2 digit contig numbers have
       # 4 zeros rather than 5 - hence use sprintf)
-      $sequence->display_id =~ m/^\.\d+_\d+_\d+\.(\d+)$/;
-      my $new_id = "contig" . sprintf("%06d", $1);
+      my $new_id;
+
+      if ($sequence->display_id =~ m/^\.\d+_\d+_\d+\.(\d+)$/)
+      {
+         # Velvet header
+         $new_id = "contig" . sprintf("%06d", $1);
+      }
+      elsif ($sequence->display_id =~ m/^contig(\d+)$/)
+      {
+         # SPAdes header
+         $new_id = "contig" . sprintf("%06d", $1);
+      }
 
       # Write new name to tmp file
       $sequence->display_id($new_id);

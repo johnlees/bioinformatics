@@ -118,8 +118,8 @@ sub decompress_fastq($)
    print STDERR "Decompressing $fastq\n";
    my ($volume ,$directories, $file) = File::Spec->splitpath($fastq);
 
-   $file =~ m/^(.+\.fastq)\.gz/;
-   $decompressed_location = "$cwd/$1";
+   $file =~ m/^(.+\.)(fastq|fq)\.gz/;
+   $decompressed_location = "$cwd/$1$2";
    system("gzip -d -c $fastq > $decompressed_location");
 
    return($decompressed_location);
