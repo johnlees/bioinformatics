@@ -327,14 +327,14 @@ else
    # Thread to error correct reads
    # Note this returns location of corrected reads
    my $quake_thread;
-   unless ($no_quake)
+   if ($no_quake)
    {
-      print STDERR "Error correcting reads and preparing assembly\n";
-      $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
+      print STDERR "Preparing assembly\n";
    }
    else
    {
-      print STDERR "Preparing assembly\n";
+      print STDERR "Error correcting reads and preparing assembly\n";
+      $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
    }
 
    # Thread to prepare reference with cortex and stampy

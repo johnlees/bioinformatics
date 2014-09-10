@@ -46,16 +46,21 @@ sub quake_error_correct($$$)
    my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $kmer_size -p $threads &> quake.log";
    print STDERR "$quake_command\n";
 
-   system($quake_command) || die("Run of quake failed. See quake/quake.log for details\n");
+   system($quake_command);
 
    # Set paths of corrected reads
+   print STDERR "Corrected reads:\n";
+
    foreach my $sample (keys %$reads)
    {
       foreach my $read_direction (keys %{$$reads{$sample}})
       {
          my ($volume ,$directories, $file) = File::Spec->splitpath($$reads{$sample}{$read_direction});
          $file =~ m/^(.+)\.(fastq|fq)$/;
-         $corrected_reads{$sample}{$read_direction} = "$cwd/quake/$1.cor.$2";
+         my $corrected_read_name = "$cwd/quake/$1.cor.$2";
+
+         print STDERR "$corrected_read_name\n";
+         $corrected_reads{$sample}{$read_direction} = $corrected_read_name;
       }
    }
 
