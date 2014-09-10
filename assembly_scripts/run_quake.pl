@@ -24,6 +24,8 @@ Options:
    -k --kmer     The kmer size to use with quake. Set to
                  ceil[log(200*G)/log(4)] where G is the genome length
    -t --threads  The number of threads to allow quake to use
+   -s --separate Error correct each sample separately. Probably required
+                 for simulated data
 
    -h --help     This help message
 
@@ -33,10 +35,11 @@ HELP
 #
 # Main
 #
-my ($read_file, $kmer_size, $threads, $help);
+my ($read_file, $kmer_size, $threads, $separate, $help);
 GetOptions ("kmer|k=i"  => \$kmer_size,
             "threads|t=s" => \$threads,
             "reads|r=s"  => \$read_file,
+            "s|separate" => \$separate,
             "help|h"     => \$help
 		   ) or die($help_message);
 
@@ -59,10 +62,10 @@ else
    # Options ok, run quake
 
    # Get read locations in a hash
-   my($samples, $reads) = quake_wrapper::parse_read_file($read_file);
+   my($samples, $reads) = quake_wrapper::parse_read_file($read_file, 0);
 
    # Run quake
-   quake_wrapper::quake_error_correct($reads, $kmer_size, $threads);
+   quake_wrapper::quake_error_correct($reads, $kmer_size, $threads, $separate);
 
    # Done
    print "\nDone\n";

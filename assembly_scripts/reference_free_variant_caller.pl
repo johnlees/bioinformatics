@@ -112,6 +112,8 @@ sequence
                        It is best to give absolute paths
    --no-error-correct  Don't run quake on reads. Input reads are fed directly
                        into cortex
+   --separate-correct  Error correct each sample separately. Probably required
+                       for simulated data
    -o, --output        Prefix for output vcfs
    -h, --help          Shows more detailed help.
 
@@ -292,11 +294,12 @@ sub create_cortex_index($)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($assembly_file, $annotation_file, $read_file, $no_quake, $output_prefix, $help);
+my ($assembly_file, $annotation_file, $read_file, $no_quake, $sep_correct, $output_prefix, $help);
 GetOptions ("assembly|a=s"  => \$assembly_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
             "no-error-correct" => \$no_quake,
+            "separate-correct" => \$sep_correct,
             "output|o=s"  => \$output_prefix,
             "help|h"     => \$help
 		   ) or die($usage_message);
@@ -334,7 +337,7 @@ else
    else
    {
       print STDERR "Error correcting reads and preparing assembly\n";
-      $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads);
+      $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads, $sep_correct);
    }
 
    # Thread to prepare reference with cortex and stampy

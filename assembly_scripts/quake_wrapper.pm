@@ -12,9 +12,9 @@ use Cwd;
 my $quake_location = "/nfs/users/nfs_j/jl11/software/bin/quake/quake.py";
 
 # Error corrects fastq files using quake
-sub quake_error_correct($$$)
+sub quake_error_correct($$$$)
 {
-   my ($reads, $kmer_size, $threads) = @_;
+   my ($reads, $kmer_size, $threads, $separate_samples) = @_;
    my (%corrected_reads, %quake_symlinks);
 
    mkdir "quake" || die("Could not create quake directory: $!\n");
@@ -26,7 +26,9 @@ sub quake_error_correct($$$)
 
    # Quake outputs where the read files originally were, which isn't
    # necessarily writable. Create symlinks instead
+   my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $kmer_size -p $threads &>> quake.log";
    my $cwd = getcwd();
+
    foreach my $sample (keys %$reads)
    {
       foreach my $direction (keys %{$$reads{$sample}})
@@ -38,15 +40,30 @@ sub quake_error_correct($$$)
          symlink $read_location, $quake_symlinks{$sample}{$direction};
       }
       print QUAKE join(" ", $quake_symlinks{$sample}{"forward"} , $quake_symlinks{$sample}{"backward"}) . "\n";
+
+      # On simulated data quake doesn't seem to work if we correct both read
+      # pairs together, but it does if run on each one separately
+      if ($separate_samples)
+      {
+         close QUAKE;
+
+         print STDERR "$quake_command\n";
+         system($quake_command);
+
+         open (QUAKE, ">quake/$quake_input_file_name") || die("Could not open $quake_input_file_name for writing: $!");
+      }
+
    }
 
-   close QUAKE;
+   # Running quake all at once is preferable, if it works
+   if(!$separate_samples)
+   {
+      close QUAKE;
 
-   # Run quake
-   my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $kmer_size -p $threads &> quake.log";
-   print STDERR "$quake_command\n";
-
-   system($quake_command);
+      # Run quake
+      print STDERR "$quake_command\n";
+      system($quake_command);
+   }
 
    # Set paths of corrected reads
    print STDERR "Corrected reads:\n";
