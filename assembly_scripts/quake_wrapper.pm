@@ -44,7 +44,9 @@ sub quake_error_correct($$$)
 
    # Run quake
    my $quake_command = "cd quake && $quake_location -f $quake_input_file_name -k $kmer_size -p $threads &> quake.log";
-   system($quake_command);
+   print STDERR "$quake_command\n";
+
+   system($quake_command) || die("Run of quake failed. See quake/quake.log for details\n");
 
    # Set paths of corrected reads
    foreach my $sample (keys %$reads)
