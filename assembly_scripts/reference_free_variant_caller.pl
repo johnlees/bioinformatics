@@ -477,7 +477,7 @@ else
    {
       # Preprocess reference - randomly permute uncalled bases, then index
       my ($volume ,$directories, $file) = File::Spec->splitpath($assembly_file);
-      $file =~ m/^(.+)\.([^\.])$/;
+      $file =~ m/^(.+)\.([^\.]+)$/;
 
       my $ref_permuted = "$1.permute.$2";
 
