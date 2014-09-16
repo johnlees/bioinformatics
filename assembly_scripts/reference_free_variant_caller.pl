@@ -153,7 +153,7 @@ my $help_message = <<HELP;
  bsub -o variation.%J.o -e variation.%J.e -R "select[mem>1000] rusage[mem=1000]" -M1000 -n4 -R "span[hosts=1]" ./reference_free_variant_caller.pl --cortex <arguments>
 
  or for sga
- bsub -o variation.%J.o -e variation.%J.e -R "select[mem>6000] rusage[mem=6000]" -M6000 -n2 -R "span[hosts=1]" ./reference_free_variant_caller.pl --sga <arguments>
+ bsub -o variation.%J.o -e variation.%J.e -R "select[mem>500] rusage[mem=500]" -M500 -n4 -R "span[hosts=1]" ./reference_free_variant_caller.pl --sga <arguments>
 
 
  Takes an assembly and two sets of paired reads and gets variation between
@@ -328,6 +328,22 @@ sub create_cortex_index($)
    return($index_name);
 }
 
+# Using sga: Filter forward and reverse reads, then index with ropebwt
+sub sga_filter_index($$$)
+{
+   my ($forward_reads, $reverse_reads, $sample_name) = @_;
+
+   my $filtered_out = "$sample_name.filtered.fastq";
+
+   system("$sga_location preprocess --pe-mode 1 -o $filtered_out $forward_reads $reverse_reads &> filter.$sample_name.log");
+   system("$sga_location index -a ropebwt -t 2 $filtered_out &> index.$sample_name.log");
+
+   # TODO: sga error correct as option
+
+   return($filtered_out);
+}
+
+
 #****************************************************************************************#
 #* Main                                                                                 *#
 #****************************************************************************************#
@@ -488,26 +504,26 @@ else
       # Filter and quality trim reads (takes about 30 sec, uses almost no mem,
       # output size is roughly the two fastqs unzipped and concat)
       #
-      # Then index (takes about 10-15 minutes, uses about 5gb mem)
-      my @indexed_samples;
+      # Then index (takes about 10-15 minutes, uses about 250mb mem)
+      my (@indexed_samples, @sga_threads);
       foreach my $sample (keys %$reads)
       {
-         my $forward_reads = $$reads{$sample}{"forward"};
-         my $reverse_reads = $$reads{$sample}{"backward"};
+         # Filter and index using 4 threads
+         push(@sga_threads, threads->create(\&sga_filter_index, $$reads{$sample}{"forward"}, $$reads{$sample}{"backward"}, $sample));
+      }
 
-         my $filtered_out = "$sample.filtered.fastq";
-         push(@indexed_samples, $filtered_out);
-
-         # Filter
-         system("$sga_location preprocess --pe-mode 1 -o $filtered_out $forward_reads $reverse_reads &> filter.$sample.log");
-         # Index
-         system("$sga_location index $filtered_out &> index.$sample.log");
+      # Return threads
+      foreach my $index_thread (@sga_threads)
+      {
+         push(@indexed_samples, $index_thread->join());
       }
 
       # Call variants (takes about 10 minutes, uses a few hundred Mb mem)
       my $sga_x = $med_cov/3;
+      my $sga_command = "$sga_location graph-diff -k 61 -x $sga_x -r $indexed_samples[0] -b $indexed_samples[1] --ref $ref_permuted -p $output_prefix";
 
-      system("$sga_location graph-diff -k 61 -x $sga_x -r $indexed_samples[0] -b $indexed_samples[1] --ref $ref_permuted -p $output_prefix");
+      print STDERR "$sga_command\n";
+      system($sga_command);
 
       system("bgzip $output_prefix.variant.vcf -c > $fixed_vcf.gz");
       system("$bcftools_location index $fixed_vcf.gz");
