@@ -133,6 +133,8 @@ sequence
    --separate-correct  Error correct each sample separately. Probably required
                        for simulated data
 
+   --dirty             Don't clean up temporary files
+
    -h, --help          Shows more detailed help.
 
 For cortex, requires: cortex_var, bcftools, quake and jellyfish.
@@ -223,10 +225,13 @@ sub prepare_reference($)
 
    # Standardise contig names
    assembly_common::standardise_contig_names($reference_file, $ref_new);
+   assembly_common::add_tmp_file($ref_new);
 
    # Put assembly.fa location into file for cortex input
    system("echo $ref_new > $ref_se");
    mkdir "$ref_bin_dir" || die("Could not make directory $ref_bin_dir: $!\n");
+   assembly_common::add_tmp_file($ref_bin_dir);
+   assembly_common::add_tmp_file($ref_se);
 
    # Dump a binary for each kmer being used
    my $i = 0;
@@ -240,9 +245,13 @@ sub prepare_reference($)
    # Make a stampy hash of the reference
    my $stampy_command = "$stampy_location -G REF $ref_new";
    system("$stampy_command &> stampy.genome.log");
+   assembly_common::add_tmp_file("stampy.genome.log");
+   assembly_common::add_tmp_file("REF.stidx");
 
    $stampy_command = "$stampy_location -g REF -H REF";
    system("$stampy_command &> stampy.hash.log");
+   assembly_common::add_tmp_file("stampy.hash.log");
+   assembly_common::add_tmp_file("REF.sthash");
 
    # Wait for cortex jobs to finish
    foreach my $thread (@cortex_threads)
@@ -322,9 +331,14 @@ sub create_cortex_index($)
 
       close PE_F;
       close PE_R;
+
+      assembly_common::add_tmp_file($pe_1);
+      assembly_common::add_tmp_file($pe_2);
    }
 
    close INDEX;
+   assembly_common::add_tmp_file($index_name);
+
    return($index_name);
 }
 
@@ -340,6 +354,10 @@ sub sga_filter_index($$$)
 
    # TODO: sga error correct as option
 
+   # Temporary files to delete
+   my @sga_tmp_files = ($filtered_out, "$sample_name.filtered.bwt", "$sample_name.filtered.rbwt", "$sample_name.filtered.rsai", "$sample_name.filtered.sai", "filter.$sample_name.log", "index.$sample_name.log");
+   assembly_common::add_tmp_files(\@sga_tmp_files);
+
    return($filtered_out);
 }
 
@@ -349,7 +367,7 @@ sub sga_filter_index($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($assembly_file, $annotation_file, $cortex, $sga, $med_cov, $read_file, $no_quake, $sep_correct, $output_prefix, $help);
+my ($assembly_file, $annotation_file, $cortex, $sga, $med_cov, $read_file, $no_quake, $sep_correct, $output_prefix, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$assembly_file,
             "annotation|g=s" => \$annotation_file,
             "cortex" => \$cortex,
@@ -359,6 +377,7 @@ GetOptions ("assembly|a=s"  => \$assembly_file,
             "no-error-correct" => \$no_quake,
             "separate-correct" => \$sep_correct,
             "output|o=s"  => \$output_prefix,
+            "dirty" => \$dirty,
             "help|h"     => \$help
 		   ) or die($usage_message);
 
@@ -413,6 +432,7 @@ else
    {
       print STDERR "Error correcting reads and preparing assembly\n";
       $quake_thread = threads->create(\&quake_wrapper::quake_error_correct, $reads, $quake_kmer_size, $quake_threads, $sep_correct);
+      assembly_common::add_tmp_file("quake");
    }
 
    my $fixed_vcf = "$cwd/$output_prefix.decomposed_calls.vcf";
@@ -441,9 +461,13 @@ else
 
       my $cortex_command = "perl $cortex_wrapper --first_kmer $first_kmer --last_kmer $last_kmer --kmer_step $kmer_step --fastaq_index $index_name --auto_cleaning $auto_cleaning --bc $bc --pd $pd --outdir $out_dir --outvcf $output_prefix --ploidy $ploidy --refbindir $ref_bin_dir --list_ref_fasta $ref_se --stampy_hash REF --stampy_bin $stampy_location --genome_size $approx_length --mem_height $mem_height --mem_width $mem_width --squeeze_mem --vcftools_dir $old_vcftools_location --do_union $do_union --ref $ref_usage --workflow $workflow --logfile $ctx_logfile --apply_pop_classifier";
 
+      assembly_common::add_tmp_file($ctx_logfile);
+      assembly_common::add_tmp_file("ctx_out");
+
       print STDERR "Running cortex\n";
       print STDERR "$cortex_command\n\n";
       system("$cortex_command &> cortex.err");
+      assembly_common::add_tmp_file("cortex.err");
 
       # Output expected coverage for each variant type, but use correct
       # coverage and read length
@@ -501,6 +525,10 @@ else
       system("$sga_location index $ref_permuted");
       system("$sga_location gen-ssa $ref_permuted");
 
+      # Temporary files to delete
+      my @sga_tmp_files = ("$1.permute.$2", "$1.permute.bwt", "$1.permute.rbwt", "$1.permute.rsai", "$1.permute.sai", "$1.permute.ssa");
+      assembly_common::add_tmp_files(\@sga_tmp_files);
+
       # Filter and quality trim reads (takes about 30 sec, uses almost no mem,
       # output size is roughly the two fastqs unzipped and concat)
       #
@@ -534,8 +562,15 @@ else
 
    system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf.gz -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
    system($bcftools_location . " index $filtered_vcf 2>> $bcftools_stderr_file");
+   assembly_common::add_tmp_file($bcftools_stderr_file);
 
    print "Final output:\n$filtered_vcf\n";
+
+   # Remove temporary files
+   unless(defined($dirty))
+   {
+      assembly_common::clean_up();
+   }
 }
 
 exit(0);

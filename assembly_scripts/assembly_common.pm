@@ -8,6 +8,12 @@ use warnings;
 use Bio::SeqIO;
 use POSIX;
 
+use File::Spec;
+use File::Path qw(remove_tree);
+
+our @tmp_files;
+our @tmp_directories;
+
 #
 # Functions common to scripts dealing with assemblies and fastq files
 #
@@ -190,6 +196,54 @@ sub create_snps($$$)
    }
 
    return($sequence, \@mutations);
+}
+
+# Adds given file to an array of files to delete
+sub add_tmp_file($)
+{
+   my ($tmp_file) = @_;
+
+   # Get absolute path
+   my $abs_path = File::Spec->rel2abs($tmp_file);
+
+   if (-e $abs_path)
+   {
+      # Add to files, which are unlinked
+      push(@tmp_files, $abs_path);
+   }
+   elsif (-d $abs_path)
+   {
+      # Add to directories, which are removed recursively
+      push(@tmp_directories, $abs_path);
+   }
+}
+
+# Adds an array of temporary files to be deleted
+sub add_tmp_files($)
+{
+   my ($tmp_files) = @_;
+
+   foreach my $tmp_file (@$tmp_files)
+   {
+      add_tmp_file($tmp_file);
+   }
+}
+
+# Cleans up temporary files (TODO: TESTING)
+sub clean_up()
+{
+   foreach my $file (@tmp_files)
+   {
+      print STDERR "rm $file\n";
+      #unlink $file;
+   }
+
+   foreach my $directory (@tmp_directories)
+   {
+      # Remove recursively
+      print STDERR "rm -rf $directory\n";
+      #remove_tree($directory);
+   }
 }
 
 1;
