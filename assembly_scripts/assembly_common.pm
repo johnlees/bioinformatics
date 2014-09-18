@@ -205,6 +205,7 @@ sub add_tmp_file($)
    # Get absolute path
    my $abs_path = File::Spec->rel2abs($tmp_file);
 
+   # TODO: may need a lock here as using theads...
    open(TMPS, ">>$tmp_file_list") || die("Could append to $tmp_file_list: $!\n");
    print TMPS "$abs_path\n";
    close TMPS;
@@ -224,6 +225,8 @@ sub add_tmp_files($)
 # Cleans up temporary files
 sub clean_up()
 {
+   print STDERR "Removing temporary files\n";
+
    open(TMPS, $tmp_file_list) || die("Couldn't open $tmp_file_list: $!\n");
 
    while (my $file = <TMPS>)
@@ -233,13 +236,11 @@ sub clean_up()
       if (-d $file)
       {
          # Remove recursively
-         print STDERR "rm -rf $file\n";
-         #remove_tree($file);
+         remove_tree($file);
       }
       elsif (-e $file)
       {
-         print STDERR "rm $file\n";
-         #unlink $file;
+         unlink $file;
       }
       else
       {
