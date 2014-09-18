@@ -216,6 +216,10 @@ sub add_tmp_file($)
       # Add to directories, which are removed recursively
       push(@tmp_directories, $abs_path);
    }
+   else
+   {
+      print STDERR "cannot remove temporary file $abs_path\n";
+   }
 }
 
 # Adds an array of temporary files to be deleted
