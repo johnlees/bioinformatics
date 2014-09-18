@@ -11,8 +11,7 @@ use POSIX;
 use File::Spec;
 use File::Path qw(remove_tree);
 
-our @tmp_files;
-our @tmp_directories;
+our @tmp_file_list;
 
 #
 # Functions common to scripts dealing with assemblies and fastq files
@@ -199,54 +198,49 @@ sub create_snps($$$)
 }
 
 # Adds given file to an array of files to delete
-sub add_tmp_file($)
+sub add_tmp_file($$)
 {
-   my ($tmp_file) = @_;
+   my ($tmp_file, $file_array) = @_;
 
    # Get absolute path
    my $abs_path = File::Spec->rel2abs($tmp_file);
 
-   if (-e $abs_path)
-   {
-      # Add to files, which are unlinked
-      push(@tmp_files, $abs_path);
-   }
-   elsif (-d $abs_path)
-   {
-      # Add to directories, which are removed recursively
-      push(@tmp_directories, $abs_path);
-   }
-   else
-   {
-      print STDERR "cannot remove temporary file $abs_path\n";
-   }
+   push(@$file_array, $abs_path);
 }
 
 # Adds an array of temporary files to be deleted
-sub add_tmp_files($)
+sub add_tmp_files($$)
 {
-   my ($tmp_files) = @_;
+   my ($tmp_files, $tmp_file_array) = @_;
 
    foreach my $tmp_file (@$tmp_files)
    {
-      add_tmp_file($tmp_file);
+      add_tmp_file($tmp_file, $tmp_file_array);
    }
 }
 
-# Cleans up temporary files (TODO: TESTING)
-sub clean_up()
+# Cleans up temporary files
+sub clean_up($)
 {
-   foreach my $file (@tmp_files)
-   {
-      print STDERR "rm $file\n";
-      #unlink $file;
-   }
+   my ($tmp_files) = @_;
 
-   foreach my $directory (@tmp_directories)
+   foreach my $file (@$tmp_files)
    {
-      # Remove recursively
-      print STDERR "rm -rf $directory\n";
-      #remove_tree($directory);
+      if (-d $file)
+      {
+         # Remove recursively
+         print STDERR "rm -rf $file\n";
+         #remove_tree($file);
+      }
+      elsif (-e $file)
+      {
+         print STDERR "rm $file\n";
+         #unlink $file;
+      }
+      else
+      {
+         print STDERR "cannot remove temporary file $file\n";
+      }
    }
 }
 

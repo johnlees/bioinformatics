@@ -97,7 +97,7 @@ sub transfer_annotation($$)
 
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;
-   assembly_common::add_tmp_file($stderr_file);
+   assembly_common::add_tmp_file($stderr_file, \@assembly_common::tmp_file_list);
 }
 
 1;
