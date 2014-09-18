@@ -9,6 +9,13 @@ use threads;
 use File::Spec;
 use Cwd;
 
+# Allows use of perl modules in ./
+use Cwd 'abs_path';
+use File::Basename;
+use lib dirname( abs_path $0 );
+
+use assembly_common;
+
 my $quake_location = "/nfs/users/nfs_j/jl11/software/bin/quake/quake.py";
 
 # Error corrects fastq files using quake
@@ -133,6 +140,7 @@ sub parse_read_file($$)
    return(\@sample_names, \%read_locations);
 }
 
+# Unzip fastqs
 sub decompress_fastq($)
 {
    my ($fastq) = @_;
@@ -145,6 +153,9 @@ sub decompress_fastq($)
    $file =~ m/^(.+\.)(fastq|fq)\.gz/;
    $decompressed_location = "$cwd/$1$2";
    system("gzip -d -c $fastq > $decompressed_location");
+
+   # Add to tmp file list
+   assembly_common::add_tmp_file($decompressed_location);
 
    return($decompressed_location);
 }

@@ -7,6 +7,13 @@ use warnings;
 
 use Bio::Tools::GFF;
 
+# Allows use of perl modules in ./
+use Cwd 'abs_path';
+use File::Basename;
+use lib dirname( abs_path $0 );
+
+use assembly_common;
+
 #Globals
 my $tmp_annotation = "annotation.tmp";
 my $annotation_header_file = "annotation_headers.tmp";
@@ -90,6 +97,7 @@ sub transfer_annotation($$)
 
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;
+   assembly_common::add_tmp_file($stderr_file);
 }
 
 1;

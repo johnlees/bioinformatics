@@ -52,8 +52,12 @@ Maps input reads to reference, and calls snps
                        column forward reads, third column reverse reads.
                        It is best to give absolute paths
    -o, --output        Prefix for output files
+
    -t, --threads       Number of threads to use. Default 1
    -p, --prior         Prior for number of snps expected. Default 1e-3
+
+   --dirty             Don't remove temporary files
+
    -h, --help          Shows more detailed help.
 
 Requires: smalt, samtools, bcftools
@@ -74,6 +78,8 @@ sub run_smalt($$$$)
 
    my $smalt_command = "smalt map -f samsoft -i $smalt_max_insert -o $output_name $reference_name $forward_reads $reverse_reads &> $log_file";
    system($smalt_command);
+
+   assembly_common::add_tmp_file($log_file);
 
    return($output_name);
 }
@@ -101,10 +107,17 @@ sub sort_sam($)
 
    print STDERR "$sort_command\n";
    system($sort_command);
+
+   # Always remove sam file immediately as it can be derived from bam, and it
+   # is huge
    unlink $sam_file;
 
    # Index
    system("samtools index $bam_file");
+
+   # Add tmp files
+   assembly_common::add_tmp_file($bam_file);
+   assembly_common::add_tmp_file("$bam_file.bai");
 
    return($bam_file);
 }
@@ -117,6 +130,7 @@ sub merge_bams($$$)
    # Write a header of read groups and sample names to use in the merge
    my $rg_name = "rg.txt";
    open(RG, ">$rg_name") || die("Could not open $rg_name for writing: $!\n");
+   assembly_common::add_tmp_file($rg_name);
 
    my $i = 0;
    foreach my $sample (@$samples)
@@ -135,6 +149,10 @@ sub merge_bams($$$)
    system ($merge_command);
 
    system ("samtools index $output_bam");
+
+   # Add tmp files
+   assembly_common::add_tmp_file($output_bam);
+   assembly_common::add_tmp_file("$output_bam.bai");
 }
 
 #****************************************************************************************#
@@ -142,13 +160,14 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
             "output|o=s" => \$output_prefix,
             "threads|t=i" => \$threads,
             "prior|p=s"  => \$prior,
+            "dirty" => \$dirty,
             "help|h"     => \$help
 		   ) or die($usage_message);
 
@@ -176,6 +195,8 @@ else
    # transfer to vcf later
    my $new_ref = "reference.renamed.fa";
    assembly_common::standardise_contig_names($reference_file, $new_ref);
+   assembly_common::add_tmp_file($new_ref);
+   assembly_common::add_tmp_file("$new_ref.fai");
 
    $new_ref =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
@@ -183,6 +204,8 @@ else
    $reference_file = $new_ref;
 
    system("smalt index -k $smalt_k -s $smalt_s $ref_name $reference_file");
+   assembly_common::add_tmp_file("$ref_name.sma");
+   assembly_common::add_tmp_file("$ref_name.smi");
 
    # Map read pairs to reference with smalt (output sam files). Use threads
    # where possible
@@ -224,6 +247,9 @@ else
       }
    }
 
+   # Get rid of tmp directory from sorting
+   assembly_common::add_tmp_file("tmp");
+
    # Merge bams
    # Sample array is in the same order as bam file name array
    my $merged_bam = "$output_prefix.merged.bam";
@@ -240,7 +266,9 @@ else
    {
       print SAMPLES "$sample 1\n";
    }
+
    close SAMPLES;
+   assembly_common::add_tmp_file($sample_file);
 
    # Use prior if given
    if (defined($prior))
@@ -266,6 +294,13 @@ else
    system("bcftools index -f $diff_vcf_name");
 
    # TODO: bcftools stats, plot-vcfstats, bcftools filter
+   #
+
+   # Remove temporary files
+   unless(defined($dirty))
+   {
+      assembly_common::clean_up();
+   }
 }
 
 exit(0);
