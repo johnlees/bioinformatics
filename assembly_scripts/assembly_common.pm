@@ -11,7 +11,7 @@ use POSIX;
 use File::Spec;
 use File::Path qw(remove_tree);
 
-our @tmp_file_list;
+our $tmp_file_list = "temporary_files.txt";
 
 #
 # Functions common to scripts dealing with assemblies and fastq files
@@ -198,34 +198,38 @@ sub create_snps($$$)
 }
 
 # Adds given file to an array of files to delete
-sub add_tmp_file($$)
+sub add_tmp_file($)
 {
-   my ($tmp_file, $file_array) = @_;
+   my ($tmp_file) = @_;
 
    # Get absolute path
    my $abs_path = File::Spec->rel2abs($tmp_file);
 
-   push(@$file_array, $abs_path);
+   open(TMPS, ">>$tmp_file_list") || die("Could append to $tmp_file_list: $!\n");
+   print TMPS $abs_path;
+   close TMPS;
 }
 
 # Adds an array of temporary files to be deleted
-sub add_tmp_files($$)
+sub add_tmp_files($)
 {
-   my ($tmp_files, $tmp_file_array) = @_;
+   my ($tmp_files) = @_;
 
    foreach my $tmp_file (@$tmp_files)
    {
-      add_tmp_file($tmp_file, $tmp_file_array);
+      add_tmp_file($tmp_file);
    }
 }
 
 # Cleans up temporary files
-sub clean_up($)
+sub clean_up()
 {
-   my ($tmp_files) = @_;
+   open(TMPS, $tmp_file_list) || die("Couldn't open $tmp_file_list: $!\n");
 
-   foreach my $file (@$tmp_files)
+   while (my $file = <TMPS>)
    {
+      chomp $file;
+
       if (-d $file)
       {
          # Remove recursively
@@ -242,6 +246,8 @@ sub clean_up($)
          print STDERR "cannot remove temporary file $file\n";
       }
    }
+
+   unlink $tmp_file_list;
 }
 
 1;

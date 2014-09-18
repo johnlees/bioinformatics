@@ -155,7 +155,7 @@ sub decompress_fastq($)
    system("gzip -d -c $fastq > $decompressed_location");
 
    # Add to tmp file list
-   assembly_common::add_tmp_file($decompressed_location, \@assembly_common::tmp_file_list);
+   assembly_common::add_tmp_file($decompressed_location);
 
    return($decompressed_location);
 }
