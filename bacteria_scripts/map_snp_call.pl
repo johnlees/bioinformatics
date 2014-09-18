@@ -1,5 +1,10 @@
 #!/usr/bin/perl -w
 
+#
+# Uses htslib v1.0 to map two haploid samples fastq files to one of their
+# assemblies
+#
+
 use strict;
 use warnings;
 
@@ -264,3 +269,4 @@ else
 }
 
 exit(0);
+
