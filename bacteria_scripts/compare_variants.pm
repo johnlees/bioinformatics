@@ -134,7 +134,7 @@ sub extract_bp_window($$$)
    # variant
    if ($window_size % 2 == 0)
    {
-      $window_size++;
+      $window_size--;
    }
    my $half_size = ($window_size - 1)/2;
 
@@ -180,7 +180,7 @@ sub create_blastn_input($$$)
    foreach my $vcf (@$vcfs)
    {
       my $variant_list = extract_vcf_variants($vcf);
-      variant_windows(301, $variant_list, shift(@$refs), "$out_prefix.$i.fa");
+      variant_windows(300, $variant_list, shift(@$refs), "$out_prefix.$i.fa");
 
       $i++;
    }
