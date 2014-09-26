@@ -12,6 +12,13 @@ use warnings;
 use Getopt::Long;
 use Bio::SeqIO;
 
+# Allows use of perl modules in ./
+use Cwd 'abs_path';
+use File::Basename;
+use lib dirname( abs_path $0 );
+
+use assembly_pipeline;
+
 # Default cutoffs
 my $cov_cutoff = 3;
 my $len_cutoff = 300;
@@ -51,26 +58,7 @@ elsif (!defined($input_file) || !-e $input_file)
 else
 {
    # Do filtering
-   my $fasta_in = Bio::SeqIO->new(-file => $input_file,
-                                  -format => 'fasta') || die($!);
-
-   my $fasta_out = Bio::SeqIO->new(-file => ">$output_file",
-                                  -format => 'fasta') || die($!);
-
-   while (my $contig = $fasta_in->next_seq())
-   {
-      my ($length, $coverage);
-      if ($contig->id =~ /^NODE_\d+_length_(\d+)_cov_(.+)_ID_\d+$/)
-      {
-         $length = $1;
-         $coverage = $2;
-      }
-
-      if ($length >= $len_cutoff && $coverage >= $cov_cutoff)
-      {
-         $fasta_out->write_seq($contig);
-      }
-   }
+   assembly_pipeline::filter_contigs($len_cutoff, $cov_cutoff, $input_file, $output_file);
 }
 
 exit(0);
