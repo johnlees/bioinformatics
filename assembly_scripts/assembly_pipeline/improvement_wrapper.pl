@@ -14,7 +14,6 @@ my $threads = 4;
 my $cov_cutoff = 3;
 my $len_cutoff = 300;
 
-
 my $forward_reads = $ARGV[0];
 my $reverse_reads = $ARGV[1];
 

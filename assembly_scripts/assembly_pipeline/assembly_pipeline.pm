@@ -7,6 +7,8 @@ use warnings;
 
 use File::Path qw(remove_tree);
 use File::Copy;
+use File::Spec;
+use Cwd;
 
 use Bio::SeqIO;
 
@@ -88,7 +90,48 @@ sub run_improvement($$$$)
       unlink("$output_directory/$midway_improvement");
    }
 
-   move("$output_directory/$final_improvement", "$output_directory/$renamed_improvement");
+   my $output_file = "$output_directory/$renamed_improvement";
+   move("$output_directory/$final_improvement", $output_file);
+
+   return($output_file);
+}
+
+sub improve_assembly($$$$)
+{
+   my ($contigs_file, $forward_reads, $reverse_reads, $output_directory) = @_;
+
+   my $tmp_dir = "/tmp/improvement";
+   mkdir $tmp_dir || die("Could not make $tmp_dir\n");
+
+   my $new_files = create_symlinks(\($contigs_file, $forward_reads, $reverse_reads), $tmp_dir);
+   my $old_wd = getcwd();
+
+   chdir($tmp_dir);
+   my $improved_assembly = run_improvement(shift(@$new_files), shift(@$new_files), shift(@$new_files), $tmp_dir);
+   chdir($old_wd);
+
+   copy($improved_assembly, "$output_directory/improved_assembly.fa");
+
+   remove_tree($tmp_dir);
+
+}
+
+sub create_symlinks($$)
+{
+   my ($file_array, $link_directory) = @_;
+
+   my @new_files;
+
+   foreach my $file (@$file_array)
+   {
+      my ($volume,$directories,$file_name) = File::Spec->splitpath($file);
+      my $new_name = "$link_directory/$file_name";
+
+      symlink $file, $new_name;
+      push(@new_files, $new_name);
+   }
+
+   return(\@new_files);
 }
 
 # The pipeline always outputs to a new directory 'annotation' in the pwd
