@@ -30,7 +30,7 @@ sub spades_assemble($$$$)
 
    my $tmp_dir = "/tmp/spades";
 
-   system("mkdir $tmp_dir") || die("Could not make $tmp_dir\n");
+   mkdir $tmp_dir || die("Could not make $tmp_dir\n");
    run_spades($forward_reads, $reverse_reads, $tmp_dir, $threads);
 
    copy("$tmp_dir/scaffolds.fasta", "$output_dir/scaffolds.fasta");
