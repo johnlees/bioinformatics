@@ -8,6 +8,8 @@ use warnings;
 use File::Path qw(remove_tree);
 use File::Copy;
 
+use Bio::SeqIO;
+
 # Program locations
 my $spades_location = "/nfs/users/nfs_j/jl11/software/bin/spades.py";
 
