@@ -5,7 +5,7 @@ use warnings;
 
 use Getopt::Long;
 
-my $wrapper_locations = "/nfs/users/nfs_j/jl11/bioinformatics/assembly_scripts";
+my $wrapper_locations = "/nfs/users/nfs_j/jl11/bioinformatics/assembly_scripts/assembly_pipeline";
 my $log_file = "batch_assemble.log";
 
 my $help_message = <<HELP;
