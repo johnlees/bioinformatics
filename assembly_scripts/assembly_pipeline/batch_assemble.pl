@@ -41,6 +41,7 @@ sub get_fastq($$)
    my ($lane, $output_dir) = @_;
 
    my $fastq_dir = `pathfind -t lane -i $lane`;
+   chomp($fastq_dir);
 
    symlink "$fastq_dir/$lane" . "_1.fastq.gz", "$output_dir/$output_dir" . "_1.fastq.gz";
    symlink "$fastq_dir/$lane" . "_2.fastq.gz", "$output_dir/$output_dir" . "_2.fastq.gz";
