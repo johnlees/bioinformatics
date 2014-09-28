@@ -28,7 +28,7 @@ else
 {
    assembly_pipeline::spades_assemble($forward_reads, $reverse_reads, $threads, $output_dir);
 
-   assembly_pipeline::filter_contigs($len_cutoff, $cov_cutoff, "scaffolds.fasta", "scaffolds.filtered.fasta");
+   assembly_pipeline::filter_contigs($len_cutoff, $cov_cutoff, "$output_dir/scaffolds.fasta", "$output_dir/scaffolds.filtered.fasta");
 }
 
 exit(0);

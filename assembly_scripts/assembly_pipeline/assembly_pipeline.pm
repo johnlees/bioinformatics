@@ -8,7 +8,6 @@ use warnings;
 use File::Path qw(remove_tree);
 use File::Copy;
 use File::Spec;
-use Cwd;
 
 use Bio::SeqIO;
 
@@ -74,13 +73,19 @@ sub run_improvement($$$$)
 {
    my ($contigs_file, $forward_reads, $reverse_reads, $output_directory) = @_;
 
+   # Get absolute paths
+   $contigs_file = File::Spec->rel2abs($contigs_file);
+   $forward_reads = File::Spec->rel2abs($forward_reads);
+   $reverse_reads = File::Spec->rel2abs($reverse_reads);
+   $output_directory = File::Spec->rel2abs($output_directory);
+
    # File names
    my @midway_improvements = ("scaffolds.filtered.fasta.scaffolded.filtered", "scaffolds.filtered.fasta.scaffolded.gapfilled.filtered", "scaffolds.scaffolded.gapfilled.length_filtered.fa");
    my $final_improvement = "scaffolds.scaffolded.gapfilled.length_filtered.sorted.fa";
    my $renamed_improvement = "improved_assembly.fa";
 
    # Run improvement pipeline (requires pathogen softwarerc)
-   my $improve_command = "improve_assembly -a $contigs_file -f $forward_reads -r $reverse_reads -o $output_directory";
+   my $improve_command = "cd $output_directory && improve_assembly -a $contigs_file -f $forward_reads -r $reverse_reads -o $output_directory";
    system($improve_command);
 
    # Clear up files made part way through the improvement, and rename the
@@ -103,19 +108,14 @@ sub improve_assembly($$$$)
    my $tmp_dir = "/tmp/improvement";
    mkdir $tmp_dir || die("Could not make $tmp_dir\n");
 
-   my $new_files = create_symlinks(\($contigs_file, $forward_reads, $reverse_reads), $tmp_dir);
-   my $old_wd = getcwd();
-
-   chdir($tmp_dir);
-   my $improved_assembly = run_improvement(shift(@$new_files), shift(@$new_files), shift(@$new_files), $tmp_dir);
-   chdir($old_wd);
+   my $improved_assembly = run_improvement($contigs_file, $forward_reads, $reverse_reads, $tmp_dir);
 
    copy($improved_assembly, "$output_directory/improved_assembly.fa");
 
    remove_tree($tmp_dir);
-
 }
 
+# Unused, but still valid function (may be useful elsewhere?)
 sub create_symlinks($$)
 {
    my ($file_array, $link_directory) = @_;
