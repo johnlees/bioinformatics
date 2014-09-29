@@ -133,7 +133,7 @@ else
       my $improve_jobid = run_getid($improvement_command);
 
       # Annotation contingent on success
-      my $annotation_command = "bsub -w \"done($improve_jobid)\" -o $sample/logs/annotate.%J.o -e $sample/logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\" $wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
+      my $annotation_command = "cd $sample && bsub -w \"done($improve_jobid)\" -o $sample/logs/annotate.%J.o -e $sample/logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\" $wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
       my $annotation_jobid = run_getid($annotation_command);
 
       my $report = join("\n\t", "Lane:$sample", "Assembly job:\t$spades_jobid", "Improvement job:\t$improve_jobid", "Annotation job:\t$annotation_jobid");
