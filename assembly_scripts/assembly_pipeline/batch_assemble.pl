@@ -25,12 +25,13 @@ Takes a file which contains ids in the form run_lane#tag, one per line
 HELP
 
 # bsub parameters
-my $spades_threads = 4;
+my $spades_threads = 1;
 my $spades_mem = 4000;
+my $spades_tmp = 2000;
 
 my $improve_mem = 2000;
 
-my $annotate_threads = 4;
+my $annotate_threads = 1;
 my $annotate_mem = 1000;
 
 #**********************************************************************#
@@ -126,7 +127,7 @@ else
       my $reverse_reads = "$sample/$sample" . "_2.fastq.gz";
 
       # Submit assembly job & filter
-      my $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample";
+      my $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -R \"select[tmp>$spades_tmp]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample";
       my $spades_jobid = run_getid($assembly_command);
 
       # Improvement contingent on success
