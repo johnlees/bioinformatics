@@ -118,6 +118,7 @@ else
    close LANES;
 
    open(LOG, ">$log_file") || die("Couldn't write to log file $log_file: $!\n");
+   print LOG "Lane\tAssembly_job\tImprovement_job\tAnnotation_job\n";
 
    foreach my $sample (@samples)
    {
@@ -136,9 +137,9 @@ else
       my $annotation_command = "cd $sample && bsub -w \"done($improve_jobid)\" -o logs/annotate.%J.o -e logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\" $wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
       my $annotation_jobid = run_getid($annotation_command);
 
-      my $report = join("\n\t", "Lane:$sample", "Assembly job:\t$spades_jobid", "Improvement job:\t$improve_jobid", "Annotation job:\t$annotation_jobid");
+      my $report = join("\t", $sample, $spades_jobid, $improve_jobid, $annotation_jobid);
 
-      print LOG $report;
+      print LOG "$report\n";
    }
 
    close LOG;
