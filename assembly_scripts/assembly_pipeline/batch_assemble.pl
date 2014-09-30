@@ -21,6 +21,7 @@ Takes a file which contains ids in the form run_lane#tag, one per line
 
    --output    Output directory (default ./)
    --tmp       Directory to write temporary files to (default /tmp)
+   --threads   Number of threads to use (default 1)
 
    --help      Displays this help message
 
@@ -75,10 +76,11 @@ sub run_getid($)
 #**********************************************************************#
 
 # Get input parameters
-my ($sample_file, $genus, $output_directory, $tmp_directory, $help);
+my ($sample_file, $genus, $output_directory, $threads, $tmp_directory, $help);
 GetOptions("lanes=s" => \$sample_file,
            "output|o=s" => \$output_directory,
            "genus=s" => \$genus,
+           "threads=i" =>\$threads,
            "tmp=s" => \$tmp_directory,
            "help" => \$help) || die("$!\n$help_message");
 
@@ -93,9 +95,7 @@ elsif (defined($help))
 }
 else
 {
-   # Parse input, and set up input files
-   my @samples;
-
+   # Parse input
    if (!defined($output_directory))
    {
       $output_directory = "./";
@@ -106,6 +106,14 @@ else
       $tmp_directory = "/tmp/spades";
    }
 
+   if (defined($threads))
+   {
+      $spades_threads = $threads;
+      $annotate_threads = $threads;
+   }
+
+   # Set up input files
+   my @samples;
    open(LANES, "$sample_file") || die("Could not open $sample_file");
 
    while (my $lane = <LANES>)
