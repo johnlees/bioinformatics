@@ -27,13 +27,14 @@ sub run_spades($$$$)
    system($spades_command);
 }
 
-sub spades_assemble($$$$)
+sub spades_assemble($$$$$)
 {
-   my ($forward_reads, $reverse_reads, $threads, $output_dir) = @_;
+   my ($forward_reads, $reverse_reads, $threads, $output_dir, $tmp_dir) = @_;
 
-   my $tmp_dir = "/tmp/spades";
-
-   mkdir $tmp_dir || die("Could not make $tmp_dir\n");
+   if (!-d $tmp_dir)
+   {
+      mkdir $tmp_dir || die("Could not make $tmp_dir\n");
+   }
    run_spades($forward_reads, $reverse_reads, $tmp_dir, $threads);
 
    copy("$tmp_dir/scaffolds.fasta", "$output_dir/scaffolds.fasta");

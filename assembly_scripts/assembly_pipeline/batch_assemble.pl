@@ -18,7 +18,9 @@ Takes a file which contains ids in the form run_lane#tag, one per line
    --lanes     A list, one per line, of sequencing ids of the form
                run_lane#tag
    --genus     The genus of the bacteria (used for annotation)
+
    --output    Output directory (default ./)
+   --tmp       Directory to write temporary files to (default /tmp)
 
    --help      Displays this help message
 
@@ -73,10 +75,11 @@ sub run_getid($)
 #**********************************************************************#
 
 # Get input parameters
-my ($sample_file, $genus, $output_directory, $help);
+my ($sample_file, $genus, $output_directory, $tmp_directory, $help);
 GetOptions("lanes=s" => \$sample_file,
            "output|o=s" => \$output_directory,
            "genus=s" => \$genus,
+           "tmp=s" => \$tmp_directory,
            "help" => \$help) || die("$!\n$help_message");
 
 if (!defined($sample_file) || !-e $sample_file)
@@ -92,6 +95,16 @@ else
 {
    # Parse input, and set up input files
    my @samples;
+
+   if (!defined($output_directory))
+   {
+      $output_directory = "./";
+   }
+
+   if (!defined($tmp_directory))
+   {
+      $tmp_directory = "/tmp/spades";
+   }
 
    open(LANES, "$sample_file") || die("Could not open $sample_file");
 
@@ -127,7 +140,16 @@ else
       my $reverse_reads = "$sample/$sample" . "_2.fastq.gz";
 
       # Submit assembly job & filter
-      my $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -R \"select[tmp>$spades_tmp]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample";
+      my $assembly_command;
+      if ($tmp_directory =~ /^\/tmp/)
+      {
+         $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -R \"select[tmp>$spades_tmp]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample $spades_threads $tmp_directory";
+      }
+      else
+      {
+         $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample $spades_threads $tmp_directory";
+      }
+
       my $spades_jobid = run_getid($assembly_command);
 
       # Improvement contingent on success
