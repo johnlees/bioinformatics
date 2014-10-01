@@ -16,7 +16,7 @@ my $spades_location = "/nfs/users/nfs_j/jl11/software/bin/spades.py";
 
 # Program parameters
 my $spades_kmers = "21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89";
-my $spades_maxmem = 8; # in GiB
+my $spades_maxmem = 24; # in GiB
 
 sub run_spades($$$$)
 {

@@ -15,13 +15,20 @@ Submit assembly and annotation jobs across lsf
 Takes a file which contains ids in the form run_lane#tag, one per line
 
    Options
-   --lanes     A list, one per line, of sequencing ids of the form
-               run_lane#tag
-   --genus     The genus of the bacteria (used for annotation)
+   --lanes       A list, one per line, of sequencing ids of the form
+                 run_lane#tag
+   --genus       The genus of the bacteria (used for annotation)
 
-   --output    Output directory (default ./)
-   --tmp       Directory to write temporary files to (default /tmp)
-   --threads   Number of threads to use (default 1)
+   --output      Output directory (default ./)
+   --tmp         Directory to write temporary files to (default /tmp)
+   --threads     Number of threads to use (default 1)
+   --mem         Comma separated list of memory to submit each step with
+                 Default: 4000,2000,1200
+
+   --nosymlinks  Do not create subdirectories with symlinks, as they
+                 already exist
+   --improve     Run from improvement step
+   --annotate    Run from annotation step
 
    --help      Displays this help message
 
@@ -35,7 +42,7 @@ my $spades_tmp = 2000;
 my $improve_mem = 2000;
 
 my $annotate_threads = 1;
-my $annotate_mem = 1000;
+my $annotate_mem = 1200;
 
 #**********************************************************************#
 #* Subs                                                               *#
@@ -76,10 +83,11 @@ sub run_getid($)
 #**********************************************************************#
 
 # Get input parameters
-my ($sample_file, $genus, $output_directory, $threads, $tmp_directory, $help);
+my ($sample_file, $genus, $output_directory, $threads, $mem_string, $tmp_directory, $help);
 GetOptions("lanes=s" => \$sample_file,
            "output|o=s" => \$output_directory,
            "genus=s" => \$genus,
+           "mem=s" => \$mem_string,
            "threads=i" =>\$threads,
            "tmp=s" => \$tmp_directory,
            "help" => \$help) || die("$!\n$help_message");
@@ -110,6 +118,11 @@ else
    {
       $spades_threads = $threads;
       $annotate_threads = $threads;
+   }
+
+   if (defined($mem_string))
+   {
+      ($spades_mem, $improve_mem, $annotate_mem) = split(",", $mem_string);
    }
 
    # Set up input files
