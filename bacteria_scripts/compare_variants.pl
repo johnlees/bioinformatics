@@ -36,6 +36,10 @@ else
    my @vcfs = ($vcf1, $vcf2);
    my @refs = ($ref1, $ref2);
 
+   #TODO: it might actually be better to use BLAT. It probably won't make much
+   # difference but this is kind of what it's designed for from what I can tell,
+   # and the input creation may be easier. It will run faster, but on 300bp
+   # this doesn't make a difference
    compare_variants::create_blastn_input(\@vcfs, \@refs, "blast_windows");
    my $blast_scores = compare_variants::blastn_pairwise("blast_windows.1.fa", "blast_windows.2.fa");
 
