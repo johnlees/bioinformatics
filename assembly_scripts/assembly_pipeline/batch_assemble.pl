@@ -40,6 +40,7 @@ my $spades_mem = 4000;
 my $spades_tmp = 2000;
 
 my $improve_mem = 2000;
+my $improve_tmp = 1300;
 
 my $annotate_threads = 1;
 my $annotate_mem = 1200;
@@ -176,7 +177,16 @@ else
       my $spades_jobid = run_getid($assembly_command);
 
       # Improvement contingent on success
-      my $improvement_command = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -w \"done($spades_jobid)\" -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -M$improve_mem $wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample";
+      my $improvement_command;
+      if ($tmp_directory =~ /^\/tmp/)
+      {
+         $improvement_command = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -w \"done($spades_jobid)\" -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -R \"select[tmp>$improve_tmp]\" -M$improve_mem $wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample $tmp_sample_dir";
+      }
+      else
+      {
+         $improvement_command = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -w \"done($spades_jobid)\" -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -M$improve_mem $wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample $tmp_sample_dir";
+      }
+
       my $improve_jobid = run_getid($improvement_command);
 
       # Annotation contingent on success

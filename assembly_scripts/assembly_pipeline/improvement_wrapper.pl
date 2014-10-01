@@ -20,6 +20,7 @@ my $reverse_reads = $ARGV[1];
 my $contigs = $ARGV[2];
 
 my $output_dir = $ARGV[3];
+my $tmp_dir = $ARGV[4];
 
 if (!defined($forward_reads) || !defined($reverse_reads) || !defined($output_dir) || !defined($contigs))
 {
@@ -27,7 +28,7 @@ if (!defined($forward_reads) || !defined($reverse_reads) || !defined($output_dir
 }
 else
 {
-   assembly_pipeline::run_improvement($contigs, $forward_reads, $reverse_reads, $output_dir);
+   assembly_pipeline::improve_assembly($contigs, $forward_reads, $reverse_reads, $output_dir, $tmp_dir);
 }
 
 exit(0);

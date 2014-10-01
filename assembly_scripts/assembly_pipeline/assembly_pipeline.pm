@@ -102,12 +102,14 @@ sub run_improvement($$$$)
    return($output_file);
 }
 
-sub improve_assembly($$$$)
+sub improve_assembly($$$$$)
 {
-   my ($contigs_file, $forward_reads, $reverse_reads, $output_directory) = @_;
+   my ($contigs_file, $forward_reads, $reverse_reads, $output_directory, $tmp_dir) = @_;
 
-   my $tmp_dir = "/tmp/improvement";
-   mkdir $tmp_dir || die("Could not make $tmp_dir\n");
+   if (!-d $tmp_dir)
+   {
+      mkdir $tmp_dir || die("Could not make $tmp_dir\n");
+   }
 
    my $improved_assembly = run_improvement($contigs_file, $forward_reads, $reverse_reads, $tmp_dir);
 
