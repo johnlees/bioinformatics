@@ -188,7 +188,7 @@ else
          $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample $spades_threads $tmp_sample_dir";
       }
 
-      if (!(defined($from_annotation) || defined($from_annotation)))
+      unless (defined($from_improvement) || defined($from_annotation))
       {
          $spades_jobid = run_getid($assembly_command);
       }
@@ -204,9 +204,9 @@ else
          $improvement_bsub .= " -R \"select[tmp>$improve_tmp]\"";
       }
 
-      my $improvement_command = "$wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample";
+      my $improvement_command = "$wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample $tmp_sample_dir";
 
-      if (!defined($from_annotation))
+      unless (defined($from_annotation))
       {
          $improve_jobid = run_getid("$improvement_bsub $improvement_command");
       }
@@ -215,7 +215,7 @@ else
       my $annotation_bsub = "cd $sample && bsub -o logs/annotate.%J.o -e logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\"";
       if ($improve_jobid ne "na")
       {
-         $annotation_bsub .= "-w \"done($improve_jobid)\"";
+         $annotation_bsub .= " -w \"done($improve_jobid)\"";
       }
 
       my $annotation_command = "$wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
