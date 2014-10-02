@@ -188,7 +188,7 @@ else
          $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample $spades_threads $tmp_sample_dir";
       }
 
-      if(!defined($from_annotation) && !defined($from_annotation))
+      if (!(defined($from_annotation) || defined($from_annotation)))
       {
          $spades_jobid = run_getid($assembly_command);
       }
