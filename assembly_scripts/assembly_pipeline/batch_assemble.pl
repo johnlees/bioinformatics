@@ -84,13 +84,16 @@ sub run_getid($)
 #**********************************************************************#
 
 # Get input parameters
-my ($sample_file, $genus, $output_directory, $threads, $mem_string, $tmp_directory, $help);
+my ($sample_file, $genus, $output_directory, $threads, $mem_string, $from_improvement, $from_annotation, $no_symlinks, $tmp_directory, $help);
 GetOptions("lanes=s" => \$sample_file,
            "output|o=s" => \$output_directory,
            "genus=s" => \$genus,
            "mem=s" => \$mem_string,
            "threads=i" =>\$threads,
            "tmp=s" => \$tmp_directory,
+           "nosymlinks" => \$no_symlinks,
+           "improve" => \$from_improvement,
+           "annotate" => \$from_annotation,
            "help" => \$help) || die("$!\n$help_message");
 
 if (!defined($sample_file) || !-e $sample_file)
@@ -134,16 +137,23 @@ else
    {
       chomp($lane);
 
-      if ($lane =~ m/^(\d+)_(\d+)#(\d+)$/)
+      if ($lane =~ m/^(\d+)_(\d+)[#_](\d+)$/)
       {
          my $lane_name = "$1_$2_$3";
          push(@samples, $lane_name);
 
          # Rename to avoid irritating hashes, then symlink fastqs into that
          # directory
-         mkdir $lane_name;
-         mkdir "$lane_name/logs";
-         get_fastq($lane, $lane_name);
+         if (!-d $lane_name)
+         {
+            mkdir $lane_name;
+            mkdir "$lane_name/logs";
+         }
+
+         unless($no_symlinks)
+         {
+            get_fastq($lane, $lane_name);
+         }
       }
       else
       {
@@ -155,6 +165,10 @@ else
 
    open(LOG, ">$log_file") || die("Couldn't write to log file $log_file: $!\n");
    print LOG "Lane\tAssembly_job\tImprovement_job\tAnnotation_job\n";
+
+   my $spades_jobid = "na";
+   my $improve_jobid = "na";
+   my $annotation_jobid = "na";
 
    foreach my $sample (@samples)
    {
@@ -174,24 +188,38 @@ else
          $assembly_command = "bsub -o $sample/logs/spades.%J.o -e $sample/logs/spades.%J.e -n$spades_threads -R \"span[hosts=1]\" -R \"select[mem>$spades_mem] rusage[mem=$spades_mem]\" -M$spades_mem $wrapper_locations/spades_wrapper.pl $forward_reads $reverse_reads $sample $spades_threads $tmp_sample_dir";
       }
 
-      my $spades_jobid = run_getid($assembly_command);
+      if(!defined($from_annotation) && !defined($from_annotation))
+      {
+         $spades_jobid = run_getid($assembly_command);
+      }
 
       # Improvement contingent on success
-      my $improvement_command;
+      my $improvement_bsub = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -M$improve_mem";
+      if ($spades_jobid ne "na")
+      {
+         $improvement_bsub .= " -w \"done($spades_jobid)\"";
+      }
       if ($tmp_directory =~ /^\/tmp/)
       {
-         $improvement_command = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -w \"done($spades_jobid)\" -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -R \"select[tmp>$improve_tmp]\" -M$improve_mem $wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample $tmp_sample_dir";
-      }
-      else
-      {
-         $improvement_command = "bsub -o $sample/logs/improve_assembly.%J.o -e $sample/logs/improve_assembly.%J.e -w \"done($spades_jobid)\" -R \"select[mem>$improve_mem] rusage[mem=$improve_mem]\" -M$improve_mem $wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample $tmp_sample_dir";
+         $improvement_bsub .= " -R \"select[tmp>$improve_tmp]\"";
       }
 
-      my $improve_jobid = run_getid($improvement_command);
+      my $improvement_command = "$wrapper_locations/improvement_wrapper.pl $forward_reads $reverse_reads $sample/scaffolds.filtered.fasta $sample";
+
+      if (!defined($from_annotation))
+      {
+         $improve_jobid = run_getid("$improvement_bsub $improvement_command");
+      }
 
       # Annotation contingent on success
-      my $annotation_command = "cd $sample && bsub -w \"done($improve_jobid)\" -o logs/annotate.%J.o -e logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\" $wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
-      my $annotation_jobid = run_getid($annotation_command);
+      my $annotation_bsub = "cd $sample && bsub -o logs/annotate.%J.o -e logs/annotate.%J.e -R \"select[mem>$annotate_mem] rusage[mem=$annotate_mem]\" -M$annotate_mem -n$annotate_threads -R \"span[hosts=1]\"";
+      if ($improve_jobid ne "na")
+      {
+         $annotation_bsub .= "-w \"done($improve_jobid)\"";
+      }
+
+      my $annotation_command = "$wrapper_locations/annotation_wrapper.pl improved_assembly.fa $sample $genus $annotate_threads";
+      my $annotation_jobid = run_getid("$annotation_bsub $annotation_command");
 
       my $report = join("\t", $sample, $spades_jobid, $improve_jobid, $annotation_jobid);
 
