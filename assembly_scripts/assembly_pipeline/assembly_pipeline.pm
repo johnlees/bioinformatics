@@ -18,6 +18,7 @@ my $spades_location = "/nfs/users/nfs_j/jl11/software/bin/spades.py";
 my $spades_kmers = "21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89";
 my $spades_maxmem = 24; # in GiB
 
+# Spades command, do not use directly
 sub run_spades($$$$)
 {
    my ($forward_reads, $reverse_reads, $output_dir, $threads) = @_;
@@ -25,8 +26,16 @@ sub run_spades($$$$)
    my $spades_command = "$spades_location -o $output_dir -1 $forward_reads -2 $reverse_reads --careful -t $threads -m $spades_maxmem -k $spades_kmers";
 
    system($spades_command);
+
+   # Check output exists
+   if (!-e "$output_dir/scaffolds.fasta" || !-e "$output_dir/contigs.fasta")
+   {
+      die("Assembly to $output_dir failed!\n");
+   }
+
 }
 
+# Sub for spades assembly that works with tmp dirs
 sub spades_assemble($$$$$)
 {
    my ($forward_reads, $reverse_reads, $threads, $output_dir, $tmp_dir) = @_;
@@ -43,6 +52,7 @@ sub spades_assemble($$$$$)
    remove_tree($tmp_dir);
 }
 
+# Filters spades output based on fasta headers
 sub filter_contigs($$$$)
 {
    my ($len_cutoff, $cov_cutoff, $input_file, $output_file) = @_;
@@ -69,7 +79,7 @@ sub filter_contigs($$$$)
    }
 }
 
-# Fine to use scaffolds as input
+# Don't call directly
 sub run_improvement($$$$)
 {
    my ($contigs_file, $forward_reads, $reverse_reads, $output_directory) = @_;
@@ -89,6 +99,12 @@ sub run_improvement($$$$)
    my $improve_command = "cd $output_directory && improve_assembly -a $contigs_file -f $forward_reads -r $reverse_reads -o $output_directory";
    system($improve_command);
 
+   # Check file was successfully produced, otherwise die
+   if (!-e "$output_directory/$final_improvement")
+   {
+      die("Improvement step in $output_directory failed!\n");
+   }
+
    # Clear up files made part way through the improvement, and rename the
    # improved assembly to something more meaningful
    foreach my $midway_improvement (@midway_improvements)
@@ -102,6 +118,7 @@ sub run_improvement($$$$)
    return($output_file);
 }
 
+# Use this for improvement. Fine to use scaffolds as input
 sub improve_assembly($$$$$)
 {
    my ($contigs_file, $forward_reads, $reverse_reads, $output_directory, $tmp_dir) = @_;
@@ -145,7 +162,14 @@ sub run_annotation($$$$)
    my $annotate_command = "annotate_bacteria -a $contigs_file --sample_name $sample_name --genus $genus --cpus $threads";
    system($annotate_command);
 
-   symlink "annotation/$sample_name.gff", "annotation.gff";
+   if (-e "annotation/$sample_name.gff")
+   {
+      symlink "annotation/$sample_name.gff", "annotation.gff";
+   }
+   else
+   {
+      die("Annotation of $sample_name failed!\n");
+   }
 }
 
 1;
