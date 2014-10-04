@@ -16,13 +16,14 @@ my $spades_location = "/nfs/users/nfs_j/jl11/software/bin/spades.py";
 
 # Program parameters
 my $spades_kmers = "21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89";
+my $spades_maxmem = 24; # in GiB
 
 # Spades command, do not use directly
 sub run_spades($$$$)
 {
    my ($forward_reads, $reverse_reads, $output_dir, $threads) = @_;
 
-   my $spades_command = "$spades_location -o $output_dir -1 $forward_reads -2 $reverse_reads --careful -t $threads -k $spades_kmers";
+   my $spades_command = "$spades_location -o $output_dir -1 $forward_reads -2 $reverse_reads --careful -t $threads -m $spades_maxmem -k $spades_kmers";
 
    system($spades_command);
 
