@@ -51,26 +51,32 @@ returns information on the likely allele type for the ivr/hsd R-M system locus
 
    -h, --help            Displays this message
 
-For cortex, requires: cortex_var, bcftools, quake and jellyfish.
-For sga, requires: sga
-See help for more details
 HELP
 
-sub make_query_fasta($$)
+sub make_query_fasta($$$)
 {
-   my ($genes, $f_out) = @_;
+   my ($genes, $sequences, $f_out) = @_;
 
    my $sequence_out = Bio::SeqIO->new( -file   => ">$f_out",
                                        -format => "fasta") || die ($!);
 
-   my $i = 1;
-   foreach my $feature (@$genes)
+   foreach my $sequence (@$sequences)
    {
-      my $new_gene = Bio::Seq->new( -seq => $feature->seq(),
-                                    -display_id => "hsdS_$i");
-      $i++;
+      foreach my $feature ($sequence->get_SeqFeatures())
+      {
+         my @feature_ids = $feature->get_tag_values("ID");
+         foreach my $gene_id (@$genes)
+         {
+            my @hsds_ids = $gene_id->get_tag_values("ID");
+            if ($hsds_ids[0] eq $feature_ids[0])
+            {
+               my $hsds_out = Bio::Seq->new( -seq => $feature->seq->seq(),
+                                             -display_id => $hsds_ids[0]);
 
-      $sequence_out->write_seq($new_gene);
+               $sequence_out->write_seq($hsds_out);
+            }
+         }
+      }
    }
 
    $sequence_out->close();
@@ -81,9 +87,8 @@ sub extract_hsds($)
    my ($annotation_file) = @_;
 
    my $gff_in = Bio::Tools::GFF->new(-file => $annotation_file,
-                                     -gff_version => 3,
-                                     -ignore_sequence => 0,
-                                     -features_attached_to_seqs => 1) || die ("Could not open $annotation_file as gff v3: $!");
+                                     -gff_version => 3) || die ("Could not open $annotation_file as gff v3: $!");
+   $gff_in->features_attached_to_seqs(1);
 
    # Hash of arrays, whose reference will be returned
    my %hsd_genes;
@@ -98,7 +103,7 @@ sub extract_hsds($)
          my $strand = $feature->strand();
          push(@gene_strands, $strand);
 
-         my $product = $feature->get_tag_values("product");
+         my $product = join(",", $feature->get_tag_values("product"));
 
          # This annotation is part of a type I R-M system
          if ($product =~ /type I restriction/)
@@ -135,45 +140,54 @@ sub extract_hsds($)
       }
    }
 
+   my @sequences = $gff_in->get_seqs();
+
    $gff_in->close();
 
    # Now look through gene order, and try and find hsdS flanked by hsdM and
    # creX/xerC
-   my (@confident_hsds_genes, @likely_hsds_genes, @possible_hsds_genes, @hsds_genes);
+   my (@confident_hsds_genes, @likely_hsds_genes, @possible_hsds_genes, $hsds_genes);
+   my $j = 0;
    for (my $i = 0; $i < scalar(@gene_order); $i++)
    {
       if ($gene_order[$i] eq "hsdS")
       {
          if ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" && $gene_order[$i+(1*$gene_strands[$i])] eq "recombinase")
          {
-            push(@confident_hsds_genes, ${$hsd_genes{hsdS}}[$i]);
+            push(@confident_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
          }
          elsif ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" || $gene_order[$i+(1*$gene_strands[$i])] eq "recombinase")
          {
-            push(@likely_hsds_genes, ${$hsd_genes{hsdS}}[$i]);
+            push(@likely_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
          }
          else
          {
-            push(@possible_hsds_genes, ${$hsd_genes{hsdS}}[$i]);
+            push(@possible_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
          }
-       }
+
+         $j++;
+      }
    }
 
    # Pick most confident existing set
    if (scalar(@confident_hsds_genes) > 0)
    {
-      @hsds_genes = @confident_hsds_genes;
+      $hsds_genes = \@confident_hsds_genes;
    }
    elsif (scalar(@likely_hsds_genes) > 0)
    {
-      @hsds_genes = @likely_hsds_genes;
+      $hsds_genes = \@likely_hsds_genes;
+   }
+   elsif (scalar(@possible_hsds_genes) > 0)
+   {
+      $hsds_genes = \@possible_hsds_genes;
    }
    else
    {
-      @hsds_genes = @possible_hsds_genes;
+      die("No plausible hsdS genes!\n");
    }
 
-   return(\@hsds_genes);
+   return($hsds_genes, \@sequences);
 }
 
 sub tblastx($$$)
@@ -197,6 +211,7 @@ sub tblastx($$$)
       if ($score > $high_score)
       {
          $top_hit = $subject_id;
+         $high_score = $score;
       }
    }
 
@@ -249,10 +264,10 @@ elsif (defined($assembly))
    print STDERR "Using assembly\n\n";
 
    # This returns gff features, with attached sequence
-   my $hsds_genes = extract_hsds($annotation_file);
+   my ($hsds_genes, $sequences) = extract_hsds($annotation_file);
 
    # Process these objects into a multifasta to use as a blast query
-   make_query_fasta($hsds_genes, $query_fasta);
+   make_query_fasta($hsds_genes, $sequences, $query_fasta);
 
    # Run a protein blast for C and N termini
    my $N_term = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
