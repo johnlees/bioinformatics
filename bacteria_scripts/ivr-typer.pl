@@ -53,6 +53,74 @@ returns information on the likely allele type for the ivr/hsd R-M system locus
 
 HELP
 
+# Need to remove contigs with no features due to failings of Bio::Tools::GFF
+# used with attach_seqs
+# Should all be sorted by contig:position
+sub pre_process_gff($$)
+{
+   my ($file_in, $file_out) = @_;
+
+   my $gff_tmp = "tmp.gff";
+   my $fasta_tmp = "tmp.fa";
+
+   if (-e $gff_tmp || -e $fasta_tmp)
+   {
+      die("$gff_tmp or $fasta_tmp already exist. Will not overwrite\n");
+   }
+
+   my $gff_in = Bio::Tools::GFF->new(-file => $file_in,
+                                     -gff_version => 3) || die ("Could not open $file_in as gff v3: $!");
+   my $gff_out = Bio::Tools::GFF->new(-file => ">$gff_tmp",
+                                     -gff_version => 3) || die ("Could not write to $gff_tmp as gff v3: $!");
+
+   my (@contigs, $last_contig);
+   foreach my $feature ($gff_in->next_feature())
+   {
+      $gff_out->write_feature($feature);
+
+      if ($feature->seq_id() ne $last_contig)
+      {
+         $last_contig = $feature->seq_id();
+         push(@contigs, $last_contig);
+      }
+   }
+
+   my @contig_sequences = $gff_in->get_seqs();
+
+   $gff_in->close();
+
+   my $fasta_out = Bio::SeqIO->new( -file   => ">$fasta_tmp",
+                                    -format => "fasta") || die("Could not write to $fasta_tmp: $!");
+
+   my $next_contig = shift(@contigs);
+   foreach my $contig (@contig_sequences)
+   {
+      if ($contig->display_id() eq $next_contig)
+      {
+         $next_contig = shift(@contigs);
+         $fasta_out->write_seq($contig);
+      }
+   }
+
+   #system("echo \"##FASTA\" | cat $gff_tmp - $fasta_tmp > $file_out");
+   open(GFF, "$gff_tmp") || die("Could not open $gff_tmp\n");
+   open(FASTA, "$fasta_tmp") || die("Could not open $fasta_tmp\n");
+   open(OUT, ">$file_out") || die("Could not write to $file_out\n");
+
+   while (my $gff_line = <GFF>)
+   {
+      print OUT $gff_line;
+   }
+   print OUT "##FASTA";
+   while (my $fasta_line = <FASTA>)
+   {
+      print OUT $fasta_line;
+   }
+
+   unlink $gff_tmp, $fasta_tmp;
+
+}
+
 sub make_query_fasta($$$)
 {
    my ($genes, $sequences, $f_out) = @_;
@@ -86,8 +154,11 @@ sub extract_hsds($)
 {
    my ($annotation_file) = @_;
 
-   my $gff_in = Bio::Tools::GFF->new(-file => $annotation_file,
-                                     -gff_version => 3) || die ("Could not open $annotation_file as gff v3: $!");
+   my $tmp_annot_file = "annotation.tmp";
+   pre_process_gff($annotation_file, $tmp_annot_file);
+
+   my $gff_in = Bio::Tools::GFF->new(-file => $tmp_annot_file,
+                                     -gff_version => 3) || die ("Could not open $tmp_annot_file as gff v3: $!");
    $gff_in->features_attached_to_seqs(1);
 
    # Hash of arrays, whose reference will be returned
