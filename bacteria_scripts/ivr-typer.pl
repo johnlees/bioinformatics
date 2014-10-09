@@ -11,13 +11,13 @@ use Bio::Tools::GFF;
 #
 # Globals
 #
-my $query_fasta = "hsdS_query.fa";
+my $query_fasta_suffix = "hsdS_query.fa";
 
 my $N_term_ref = "Ntermini.fasta";
 my $C_term_ref = "Ctermini.fasta";
 
-my $N_blast_out = "Ntermini.blast.out";
-my $C_blast_out = "Ctermini.blast.out";
+my $N_blast_suffix = "Ntermini.blast.out";
+my $C_blast_suffix = "Ctermini.blast.out";
 my $blast_err = "blast.err";
 
 my %allele_map = ("Aa" => "A",
@@ -47,6 +47,10 @@ returns information on the likely allele type for the ivr/hsd R-M system locus
 
    <assembly mode>
    -a, --annotation      Annotation of the -a assembly in gff v3.
+   -b, --batch           Batch mode. Interprets the annotation option as a
+                         list of gff files instead of a single file. A second
+                         (tab separated) field with samples names can be used
+                         STDOUT can be piped to get list of alleles by sample
 
 
    -h, --help            Displays this message
@@ -278,13 +282,14 @@ sub tblastx($$$)
 {
    my ($subject, $query, $output_file) = @_;
 
-   my $blast_command = "tblastx -subject $subject -query $query -outfmt \"6 qseqid sallseqid evalue score\" > $output_file 2> $blast_err";
+   my $blast_command = "tblastx -subject $subject -query $query -outfmt \"6 qseqid sallseqid evalue score\" > $output_file 2>> $blast_err";
    system($blast_command);
 
    # Parse output to extract best hit
    open(BLAST, "$output_file") || die("Could not open $output_file: $!\n");
 
    my $high_score = 0;
+   my $best_gene_score = 0;
    my ($top_hit, $top_query);
 
    while (my $blast_line = <BLAST>)
@@ -294,9 +299,17 @@ sub tblastx($$$)
       my ($query_id, $subject_id, $e_value, $score) = split("\t", $blast_line);
       if ($score > $high_score)
       {
-         $top_hit = $subject_id;
-         $top_query = $query_id;
-         $high_score = $score;
+         #output highest scoring gene, not highest scoring blast hit
+         $query_id =~ m/score(\d+)$/;
+         my $gene_score = $1;
+
+         if ($gene_score >= $best_gene_score)
+         {
+            $top_hit = $subject_id;
+            $top_query = $query_id;
+            $high_score = $score;
+            $best_gene_score = $gene_score;
+         }
       }
    }
 
@@ -305,26 +318,26 @@ sub tblastx($$$)
    return($top_hit, $top_query);
 }
 
-sub print_allele($$$$)
+sub print_allele($$$$$)
 {
-   my ($N_term, $N_query, $C_term, $C_query) = @_;
+   my ($sample, $N_term, $N_query, $C_term, $C_query) = @_;
 
-   print STDERR "Most likely (highest scoring) allele:\n";
 
-   print join("\t", "$N_term$C_term", $allele_map{"$N_term$C_term"}, $N_query, $C_query) . "\n";
+   print join("\t", $sample, "$N_term$C_term", $allele_map{"$N_term$C_term"}, $N_query, $C_query) . "\n";
 }
 
 
 #
 # Main
 #
-my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file, $help);
+my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file, $batch, $help);
 GetOptions ("map"       => \$map,
             "assembly"    => \$assembly,
             "ref_dir=s" => \$ref_dir,
             "forward_reads|f=s" => \$forward_reads,
             "reverse_reads|r=s" => \$reverse_reads,
             "annotation|a=s" => \$annotation_file,
+            "batch|b" => \$batch,
             "help|h"     => \$help
 		   ) or die($help_message);
 
@@ -348,28 +361,102 @@ elsif (defined($assembly))
       die("Must set $annotation_file for assembly mode\n");
    }
 
-   print STDERR "Using assembly\n\n";
+   print STDERR "Using assembly\n";
 
-   # This returns gff features, with attached sequence
-   my ($hsds_genes, $scores, $sequences) = extract_hsds($annotation_file);
-
-   # Process these objects into a multifasta to use as a blast query
-   make_query_fasta($hsds_genes, $scores, $sequences, $query_fasta);
-
-   # Run a protein blast for C and N termini
-   my ($N_term, $N_query) = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
-   if ($N_term =~ /^segment(.)$/)
+   my (@annotation_files, %sample_names);
+   if (defined($batch))
    {
-      $N_term = $1;
+      open(BATCH, $annotation_file) || die("Could not open $annotation_file\n");
+
+      my $i = 0;
+      while (my $batch_file_line = <BATCH>)
+      {
+         $i++;
+         chomp $batch_file_line;
+
+         my ($batch_file, $sample_name) = split("\t", $batch_file_line);
+
+         if (-e $batch_file)
+         {
+            push(@annotation_files, $batch_file);
+         }
+         else
+         {
+            print STDERR "File $batch_file does not exist, skipping\n";
+         }
+
+         if ($sample_name ne "")
+         {
+            $sample_names{$annotation_file} = $sample_name;
+         }
+      }
+
+      close BATCH;
+
+      print STDERR "in batch mode for $i files\n";
+   }
+   else
+   {
+      # Single file
+      push(@annotation_files, $annotation_file);
    }
 
-   my ($C_term, $C_query) = tblastx("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
-   if ($C_term =~ /^segment(.)$/)
-   {
-      $C_term = $1;
-   }
+   # Print header for output
+   print STDERR "Most likely (highest scoring) allele per sample:\n";
+   print join("\t", "sample", "R6", "D39", "N_term_gene", "C_term_gene\n");
 
-   print_allele($N_term, $N_query, $C_term, $C_query);
+   foreach my $annotation_file (@annotation_files)
+   {
+      # This returns gff features, with attached sequence
+      my ($hsds_genes, $scores, $sequences) = extract_hsds($annotation_file);
+
+      # Process these objects into a multifasta to use as a blast query
+      my ($query_fasta, $N_blast_out, $C_blast_out);
+      if (defined($sample_names{$annotation_file}))
+      {
+         $query_fasta = $sample_names{$annotation_file} . ".$query_fasta_suffix";
+         $N_blast_out = $sample_names{$annotation_file} . ".$N_blast_suffix";
+         $C_blast_out = $sample_names{$annotation_file} . ".$C_blast_suffix";
+      }
+      else
+      {
+         $query_fasta = $query_fasta_suffix;
+         $N_blast_out = $N_blast_suffix;
+         $C_blast_out = $C_blast_suffix;
+      }
+
+      make_query_fasta($hsds_genes, $scores, $sequences, $query_fasta);
+
+      # Run a protein blast for C and N termini
+      my ($N_term, $N_query) = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
+      if ($N_term =~ /^segment(.)$/)
+      {
+         $N_term = $1;
+      }
+
+      my ($C_term, $C_query) = tblastx("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
+      if ($C_term =~ /^segment(.)$/)
+      {
+         $C_term = $1;
+      }
+
+      if ($N_query ne $C_query)
+      {
+         print STDERR "Warning: top hit for N terminal and C terminal on different hsdS genes\n";
+      }
+
+      my $sample;
+      if (defined($sample_names{$annotation_file}))
+      {
+         $sample = $sample_names{$annotation_file};
+      }
+      else
+      {
+         $sample = "-";
+      }
+
+      print_allele($sample, $N_term, $N_query, $C_term, $C_query);
+   }
 
 }
 else
