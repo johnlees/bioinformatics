@@ -330,13 +330,13 @@ sub print_allele($$$$$)
 #
 # Main
 #
-my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file, $batch, $help);
+my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file_in, $batch, $help);
 GetOptions ("map"       => \$map,
             "assembly"    => \$assembly,
             "ref_dir=s" => \$ref_dir,
             "forward_reads|f=s" => \$forward_reads,
             "reverse_reads|r=s" => \$reverse_reads,
-            "annotation|a=s" => \$annotation_file,
+            "annotation|a=s" => \$annotation_file_in,
             "batch|b" => \$batch,
             "help|h"     => \$help
 		   ) or die($help_message);
@@ -356,9 +356,9 @@ elsif (defined($map))
 }
 elsif (defined($assembly))
 {
-   if (!defined($annotation_file) || !-e $annotation_file)
+   if (!defined($annotation_file_in) || !-e $annotation_file_in)
    {
-      die("Must set $annotation_file for assembly mode\n");
+      die("Must set $annotation_file_in for assembly mode\n");
    }
 
    print STDERR "Using assembly\n";
@@ -366,7 +366,7 @@ elsif (defined($assembly))
    my (@annotation_files, %sample_names);
    if (defined($batch))
    {
-      open(BATCH, $annotation_file) || die("Could not open $annotation_file\n");
+      open(BATCH, $annotation_file_in) || die("Could not open $annotation_file_in\n");
 
       my $i = 0;
       while (my $batch_file_line = <BATCH>)
@@ -387,7 +387,7 @@ elsif (defined($assembly))
 
          if ($sample_name ne "")
          {
-            $sample_names{$annotation_file} = $sample_name;
+            $sample_names{$batch_file} = $sample_name;
          }
       }
 
@@ -398,7 +398,7 @@ elsif (defined($assembly))
    else
    {
       # Single file
-      push(@annotation_files, $annotation_file);
+      push(@annotation_files, $annotation_file_in);
    }
 
    # Print header for output
