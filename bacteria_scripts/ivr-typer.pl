@@ -60,24 +60,21 @@ sub pre_process_gff($$)
 {
    my ($file_in, $file_out) = @_;
 
-   my $gff_tmp = "tmp.gff";
    my $fasta_tmp = "tmp.fa";
 
-   if (-e $gff_tmp || -e $fasta_tmp)
+   if (-e $fasta_tmp)
    {
-      die("$gff_tmp or $fasta_tmp already exist. Will not overwrite\n");
+      die("$fasta_tmp already exists. Will not overwrite\n");
    }
 
    my $gff_in = Bio::Tools::GFF->new(-file => $file_in,
                                      -gff_version => 3) || die ("Could not open $file_in as gff v3: $!");
-   my $gff_out = Bio::Tools::GFF->new(-file => ">$gff_tmp",
-                                     -gff_version => 3) || die ("Could not write to $gff_tmp as gff v3: $!");
 
-   my (@contigs, $last_contig);
-   foreach my $feature ($gff_in->next_feature())
+   my @contigs;
+   my $last_contig = "";
+
+   while (my $feature = $gff_in->next_feature())
    {
-      $gff_out->write_feature($feature);
-
       if ($feature->seq_id() ne $last_contig)
       {
          $last_contig = $feature->seq_id();
@@ -92,32 +89,43 @@ sub pre_process_gff($$)
    my $fasta_out = Bio::SeqIO->new( -file   => ">$fasta_tmp",
                                     -format => "fasta") || die("Could not write to $fasta_tmp: $!");
 
-   my $next_contig = shift(@contigs);
-   foreach my $contig (@contig_sequences)
+   foreach my $contig (reverse @contig_sequences)
    {
-      if ($contig->display_id() eq $next_contig)
+      foreach my $included_contig (@contigs)
       {
-         $next_contig = shift(@contigs);
-         $fasta_out->write_seq($contig);
+         if ($contig->display_id() eq $included_contig)
+         {
+            $fasta_out->write_seq($contig);
+         }
       }
    }
 
+   $fasta_out->close();
+
    #system("echo \"##FASTA\" | cat $gff_tmp - $fasta_tmp > $file_out");
-   open(GFF, "$gff_tmp") || die("Could not open $gff_tmp\n");
+   open(GFF, "$file_in") || die("Could not open $file_in\n");
    open(FASTA, "$fasta_tmp") || die("Could not open $fasta_tmp\n");
    open(OUT, ">$file_out") || die("Could not write to $file_out\n");
 
    while (my $gff_line = <GFF>)
    {
-      print OUT $gff_line;
+      if ($gff_line eq "##FASTA\n")
+      {
+         last;
+      }
+      else
+      {
+         print OUT $gff_line;
+      }
    }
-   print OUT "##FASTA";
+   print OUT "\n##FASTA\n";
    while (my $fasta_line = <FASTA>)
    {
       print OUT $fasta_line;
    }
 
-   unlink $gff_tmp, $fasta_tmp;
+   unlink $fasta_tmp;
+   close OUT;
 
 }
 
@@ -177,10 +185,10 @@ sub extract_hsds($)
          my $product = join(",", $feature->get_tag_values("product"));
 
          # This annotation is part of a type I R-M system
-         if ($product =~ /type I restriction/)
+         if ($product =~ /type I restriction/i)
          {
             # Specificity subunit
-            if ($product =~ /hsds/i || $product =~ /S protein/ || $product =~ /S subunit/)
+            if ($product =~ /hsds/i || $product =~ /S protein/ || $product =~ /S subunit/ || $product =~ /chain S/)
             {
                push(@{ $hsd_genes{hsdS} }, $feature);
                push(@gene_order, "hsdS");
@@ -214,6 +222,7 @@ sub extract_hsds($)
    my @sequences = $gff_in->get_seqs();
 
    $gff_in->close();
+   unlink $tmp_annot_file;
 
    # Now look through gene order, and try and find hsdS flanked by hsdM and
    # creX/xerC
@@ -285,6 +294,8 @@ sub tblastx($$$)
          $high_score = $score;
       }
    }
+
+   close BLAST;
 
    return($top_hit);
 }
