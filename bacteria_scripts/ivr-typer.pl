@@ -129,9 +129,9 @@ sub pre_process_gff($$)
 
 }
 
-sub make_query_fasta($$$)
+sub make_query_fasta($$$$)
 {
-   my ($genes, $sequences, $f_out) = @_;
+   my ($genes, $scores, $sequences, $f_out) = @_;
 
    my $sequence_out = Bio::SeqIO->new( -file   => ">$f_out",
                                        -format => "fasta") || die ($!);
@@ -141,16 +141,22 @@ sub make_query_fasta($$$)
       foreach my $feature ($sequence->get_SeqFeatures())
       {
          my @feature_ids = $feature->get_tag_values("ID");
+
+         my $i = 0;
          foreach my $gene_id (@$genes)
          {
+            my $score = $$scores[$i];
+
             my @hsds_ids = $gene_id->get_tag_values("ID");
             if ($hsds_ids[0] eq $feature_ids[0])
             {
                my $hsds_out = Bio::Seq->new( -seq => $feature->seq->seq(),
-                                             -display_id => $hsds_ids[0]);
+                                             -display_id => "$hsds_ids[0]_score$score");
 
                $sequence_out->write_seq($hsds_out);
             }
+
+            $i++;
          }
       }
    }
@@ -226,48 +232,46 @@ sub extract_hsds($)
 
    # Now look through gene order, and try and find hsdS flanked by hsdM and
    # creX/xerC
-   my (@confident_hsds_genes, @likely_hsds_genes, @possible_hsds_genes, $hsds_genes);
+   my (@hsds_genes, @scores);
    my $j = 0;
+
    for (my $i = 0; $i < scalar(@gene_order); $i++)
    {
       if ($gene_order[$i] eq "hsdS")
       {
-         if ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" && $gene_order[$i+(1*$gene_strands[$i])] eq "recombinase")
+         push(@hsds_genes, ${$hsd_genes{hsdS}}[$j]);
+
+         # Score each hsdS gene. One point for each correctly annotated and
+         # oriented gene in the locus
+         my $score = 1;
+
+         if ($gene_order[$i-(2*$gene_strands[$i])] eq "hsdR" && $gene_strands[$i-(2*$gene_strands[$i])] == $gene_strands[$i])
          {
-            push(@confident_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
+            $score++;
          }
-         elsif ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" || $gene_order[$i+(1*$gene_strands[$i])] eq "recombinase")
+         if ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" && $gene_strands[$i-(1*$gene_strands[$i])] == $gene_strands[$i])
          {
-            push(@likely_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
+            $score++;
          }
-         else
+         if ($gene_order[$i+(1*$gene_strands[$i])] eq "recombinase" && $gene_strands[$i+(1*$gene_strands[$i])] == $gene_strands[$i])
          {
-            push(@possible_hsds_genes, ${$hsd_genes{hsdS}}[$j]);
+            $score++;
+         }
+         if ($gene_order[$i+(2*$gene_strands[$i])] eq "hsdS" && $gene_strands[$i+(2*$gene_strands[$i])] == $gene_strands[$i])
+         {
+            $score++;
+         }
+         if ($gene_order[$i+(3*$gene_strands[$i])] eq "hsdS" && $gene_strands[$i+(3*$gene_strands[$i])] == -$gene_strands[$i])
+         {
+            $score++;
          }
 
+         push(@scores, $score);
          $j++;
       }
    }
 
-   # Pick most confident existing set
-   if (scalar(@confident_hsds_genes) > 0)
-   {
-      $hsds_genes = \@confident_hsds_genes;
-   }
-   elsif (scalar(@likely_hsds_genes) > 0)
-   {
-      $hsds_genes = \@likely_hsds_genes;
-   }
-   elsif (scalar(@possible_hsds_genes) > 0)
-   {
-      $hsds_genes = \@possible_hsds_genes;
-   }
-   else
-   {
-      die("No plausible hsdS genes!\n");
-   }
-
-   return($hsds_genes, \@sequences);
+   return(\@hsds_genes, \@scores, \@sequences);
 }
 
 sub tblastx($$$)
@@ -281,7 +285,7 @@ sub tblastx($$$)
    open(BLAST, "$output_file") || die("Could not open $output_file: $!\n");
 
    my $high_score = 0;
-   my $top_hit;
+   my ($top_hit, $top_query);
 
    while (my $blast_line = <BLAST>)
    {
@@ -291,22 +295,23 @@ sub tblastx($$$)
       if ($score > $high_score)
       {
          $top_hit = $subject_id;
+         $top_query = $query_id;
          $high_score = $score;
       }
    }
 
    close BLAST;
 
-   return($top_hit);
+   return($top_hit, $top_query);
 }
 
-sub print_allele($$)
+sub print_allele($$$$)
 {
-   my ($N_term, $C_term, $naming) = @_;
+   my ($N_term, $N_query, $C_term, $C_query) = @_;
 
    print STDERR "Most likely (highest scoring) allele:\n";
 
-   print join("\t", "$N_term$C_term", $allele_map{"$N_term$C_term"}) . "\n";
+   print join("\t", "$N_term$C_term", $allele_map{"$N_term$C_term"}, $N_query, $C_query) . "\n";
 }
 
 
@@ -346,25 +351,25 @@ elsif (defined($assembly))
    print STDERR "Using assembly\n\n";
 
    # This returns gff features, with attached sequence
-   my ($hsds_genes, $sequences) = extract_hsds($annotation_file);
+   my ($hsds_genes, $scores, $sequences) = extract_hsds($annotation_file);
 
    # Process these objects into a multifasta to use as a blast query
-   make_query_fasta($hsds_genes, $sequences, $query_fasta);
+   make_query_fasta($hsds_genes, $scores, $sequences, $query_fasta);
 
    # Run a protein blast for C and N termini
-   my $N_term = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
+   my ($N_term, $N_query) = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
    if ($N_term =~ /^segment(.)$/)
    {
       $N_term = $1;
    }
 
-   my $C_term = tblastx("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
+   my ($C_term, $C_query) = tblastx("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
    if ($C_term =~ /^segment(.)$/)
    {
       $C_term = $1;
    }
 
-   print_allele($N_term, $C_term);
+   print_allele($N_term, $N_query, $C_term, $C_query);
 
 }
 else
