@@ -250,16 +250,18 @@ sub extract_hsds($)
          push(@hsds_genes, ${$hsd_genes{hsdS}}[$j]);
 
          # Score each hsdS gene. One point for each correctly annotated and
-         # oriented gene in the locus. Score:1-6
+         # oriented gene in the locus. Score:1-8
+         # hsdM and hsdR presence is weighted more, as hsdS and recombinase
+         # tend to be more abundant
          my $score = 1;
 
          if ($gene_order[$i-(2*$gene_strands[$i])] eq "hsdR" && $gene_strands[$i-(2*$gene_strands[$i])] == $gene_strands[$i])
          {
-            $score++;
+            $score += 2;
          }
          if ($gene_order[$i-(1*$gene_strands[$i])] eq "hsdM" && $gene_strands[$i-(1*$gene_strands[$i])] == $gene_strands[$i])
          {
-            $score++;
+            $score += 2;
          }
          if ($gene_order[$i+(1*$gene_strands[$i])] eq "recombinase" && $gene_strands[$i+(1*$gene_strands[$i])] == $gene_strands[$i])
          {
