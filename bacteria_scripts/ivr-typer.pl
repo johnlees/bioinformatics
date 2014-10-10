@@ -20,6 +20,8 @@ my $N_blast_suffix = "Ntermini.blast.out";
 my $C_blast_suffix = "Ctermini.blast.out";
 my $blast_err = "blast.err";
 
+my $blast_evalue = "10e-6";
+
 my %allele_map = ("Aa" => "A",
                   "Ab" => "B",
                   "Ac" => "E",
@@ -133,6 +135,8 @@ sub pre_process_gff($$)
 
 }
 
+# Make the fasta file with the genes chosen by extract hsds. Include scores in
+# sequence ids
 sub make_query_fasta($$$$)
 {
    my ($genes, $scores, $sequences, $f_out) = @_;
@@ -246,7 +250,7 @@ sub extract_hsds($)
          push(@hsds_genes, ${$hsd_genes{hsdS}}[$j]);
 
          # Score each hsdS gene. One point for each correctly annotated and
-         # oriented gene in the locus
+         # oriented gene in the locus. Score:1-6
          my $score = 1;
 
          if ($gene_order[$i-(2*$gene_strands[$i])] eq "hsdR" && $gene_strands[$i-(2*$gene_strands[$i])] == $gene_strands[$i])
@@ -278,52 +282,101 @@ sub extract_hsds($)
    return(\@hsds_genes, \@scores, \@sequences);
 }
 
-sub tblastx($$$)
+# Run a blasn on subject and query
+sub blastn($$$)
 {
    my ($subject, $query, $output_file) = @_;
 
-   my $blast_command = "tblastx -subject $subject -query $query -outfmt \"6 qseqid sallseqid evalue score\" > $output_file 2>> $blast_err";
+   my $blast_command = "blastn -subject $subject -query $query -evalue $blast_evalue -outfmt \"6 qseqid sallseqid evalue score\" > $output_file 2>> $blast_err";
    system($blast_command);
 
-   # Parse output to extract best hit
+   # Parse output to extract best hits
    open(BLAST, "$output_file") || die("Could not open $output_file: $!\n");
 
    my $high_score = 0;
    my $best_gene_score = 0;
-   my ($top_hit, $top_query);
+   my %blast_results;
 
    while (my $blast_line = <BLAST>)
    {
       chomp($blast_line);
 
       my ($query_id, $subject_id, $e_value, $score) = split("\t", $blast_line);
-      if ($score > $high_score)
-      {
-         #output highest scoring gene, not highest scoring blast hit
-         $query_id =~ m/score(\d+)$/;
-         my $gene_score = $1;
 
-         if ($gene_score >= $best_gene_score)
+      #output highest scoring gene, not highest scoring blast hit
+      $query_id =~ m/score(\d+)$/;
+      my $gene_score = $1;
+
+      if ($gene_score >= $best_gene_score)
+      {
+         $best_gene_score = $gene_score;
+
+         if (!defined($blast_results{$query_id}{"score"}) || $score > $blast_results{$query_id}{"score"})
          {
-            $top_hit = $subject_id;
-            $top_query = $query_id;
-            $high_score = $score;
-            $best_gene_score = $gene_score;
+            $blast_results{$query_id}{"score"} = $score;
+            $blast_results{$query_id}{"hit"} = $subject_id;
          }
       }
    }
 
    close BLAST;
 
-   return($top_hit, $top_query);
+   return(\%blast_results);
 }
 
-sub print_allele($$$$$)
+# Pick the gene in both C and N terminals that gives the highest combined blast
+# score
+sub pick_hit_overlap($$)
 {
-   my ($sample, $N_term, $N_query, $C_term, $C_query) = @_;
+   # Hash refs
+   my ($hits1, $hits2) = @_;
 
+   my %combined_scores;
+   foreach my $query (keys %$hits1)
+   {
+      if (defined($$hits2{$query}{"score"}))
+      {
+         $combined_scores{$query} = $$hits1{$query}{"score"} + $$hits2{$query}{"score"};
+      }
+   }
 
-   print join("\t", $sample, "$N_term$C_term", $allele_map{"$N_term$C_term"}, $N_query, $C_query) . "\n";
+   my ($hit1, $hit2, $query_id);
+   my $high_score = 0;
+   foreach my $query (keys %combined_scores)
+   {
+      if ($combined_scores{$query} > $high_score)
+      {
+         $hit1 = $$hits1{$query}{"hit"};
+         $hit2 = $$hits2{$query}{"hit"};
+         $query_id = $query;
+
+         $high_score = $combined_scores{$query};
+      }
+   }
+
+   return($query_id, $hit1, $hit2);
+}
+
+sub print_allele($$$$)
+{
+   my ($sample, $query, $N_term, $C_term) = @_;
+
+   $N_term = seg_to_letter($N_term);
+   $C_term = seg_to_letter($C_term);
+
+   print join("\t", $sample, $query, "$N_term$C_term", $allele_map{"$N_term$C_term"}) . "\n";
+}
+
+sub seg_to_letter($)
+{
+   my ($term) = @_;
+
+   if ($term =~ /^segment(.)$/)
+   {
+      $term = $1;
+   }
+
+   return($term);
 }
 
 
@@ -403,7 +456,7 @@ elsif (defined($assembly))
 
    # Print header for output
    print STDERR "Most likely (highest scoring) allele per sample:\n";
-   print join("\t", "sample", "R6", "D39", "N_term_gene", "C_term_gene\n");
+   print join("\t", "sample", "query", "R6", "D39\n");
 
    foreach my $annotation_file (@annotation_files)
    {
@@ -428,22 +481,10 @@ elsif (defined($assembly))
       make_query_fasta($hsds_genes, $scores, $sequences, $query_fasta);
 
       # Run a protein blast for C and N termini
-      my ($N_term, $N_query) = tblastx("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
-      if ($N_term =~ /^segment(.)$/)
-      {
-         $N_term = $1;
-      }
+      my $N_term_blast = blastn("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
+      my $C_term_blast = blastn("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
 
-      my ($C_term, $C_query) = tblastx("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
-      if ($C_term =~ /^segment(.)$/)
-      {
-         $C_term = $1;
-      }
-
-      if ($N_query ne $C_query)
-      {
-         print STDERR "Warning: top hit for N terminal and C terminal on different hsdS genes\n";
-      }
+      my ($query, $N_hit, $C_hit) = pick_hit_overlap($N_term_blast, $C_term_blast);
 
       my $sample;
       if (defined($sample_names{$annotation_file}))
@@ -455,7 +496,7 @@ elsif (defined($assembly))
          $sample = "-";
       }
 
-      print_allele($sample, $N_term, $N_query, $C_term, $C_query);
+      print_allele($sample, $query, $N_hit, $C_hit);
    }
 
 }
