@@ -11,6 +11,24 @@ use Bio::Tools::GFF;
 #
 # Globals
 #
+
+# Mapping mode globals
+my $ref_prefix = "D39_v1.fa";
+my $Nterm_D39_ref = "Ntermini_D39.fasta";
+my $Cterm_D39_ref = "Ctermini_D39.fasta";
+
+my $mapped = "mapped_reads.fa";
+my $mapped_qnames = "mapped_reads.qnames";
+my $five_prime_fasta = "5prime_pairs.fa";
+my $three_prime_fasta = "3prime_pairs.fa";
+
+my $qual_cutoff = 60;
+my $blat_ident = 95;
+
+my @five_prime_regions = ("CP000410:462339-463896");
+my @three_prime_regions = ("CP000410:458072-458791", "CP000410:461520-462157");
+
+# Assembly mode globals
 my $query_fasta_suffix = "hsdS_query.fa";
 
 my $N_term_ref = "Ntermini.fasta";
@@ -22,6 +40,7 @@ my $blast_err = "blast.err";
 
 my $blast_evalue = "10e-6";
 
+# Conversion between naming conventions
 my %allele_map = ("Aa" => "A",
                   "Ab" => "B",
                   "Ac" => "E",
@@ -29,11 +48,20 @@ my %allele_map = ("Aa" => "A",
                   "Bb" => "C",
                   "Bc" => "F");
 
+my %D39_to_R6 = ("1.1" => "A",
+                 "1.2" => "B",
+                 "2.1" => "a",
+                 "2.2" => "c",
+                 "2.3" => "b");
+
 my $help_message = <<HELP;
 Usage: ./ivr_typer.pl [--map|--assembly] <options>
 
 Given S. pneumo read (via mapping mode) or annotated assembly (via assembly mode),
 returns information on the likely allele type for the ivr/hsd R-M system locus
+
+Using mapping mode will take around 800Mb memory for bam sorting, and around 5 mins
+of CPU time for mapping
 
    Options
    --map                 Infer by mapping reads to reference alleles
@@ -284,7 +312,7 @@ sub extract_hsds($)
    return(\@hsds_genes, \@scores, \@sequences);
 }
 
-# Run a blasn on subject and query
+# Run a blastn on subject and query
 sub blastn($$$)
 {
    my ($subject, $query, $output_file) = @_;
@@ -359,6 +387,7 @@ sub pick_hit_overlap($$)
    return($query_id, $hit1, $hit2);
 }
 
+# Prints sample, query, R6 and D39 alleles
 sub print_allele($$$$)
 {
    my ($sample, $query, $N_term, $C_term) = @_;
@@ -369,6 +398,7 @@ sub print_allele($$$$)
    print join("\t", $sample, $query, "$N_term$C_term", $allele_map{"$N_term$C_term"}) . "\n";
 }
 
+# Converts segment names into just the single letter that refers to them
 sub seg_to_letter($)
 {
    my ($term) = @_;
@@ -381,6 +411,96 @@ sub seg_to_letter($)
    return($term);
 }
 
+# Run bwa mem, producing sorted and indexed bam
+sub bwa_mem($$$$)
+{
+   my ($forward_reads, $reverse_reads, $reference, $output) = @_;
+
+   my $bam_sort_prefix = "tmp" . random_string();
+
+   my $bwa_command = "bwa mem $reference $forward_reads $reverse_reads | samtools sort -O bam -o $output -T $bam_sort_prefix -";
+   system($bwa_command);
+
+   system("samtools index $output");
+}
+
+# Returns an 8 character string of random alphanumeric characters
+sub random_string()
+{
+   my $string = join'', map +(0..9,'a'..'z','A'..'Z')[rand(10+26*2)], 1..8;
+
+   return $string;
+}
+
+# Writes a fasta file of all read pairs lying downstream of mapped pairs in the
+# specified regions
+sub downstream_fasta($$$)
+{
+   my ($bam_file, $regions, $downstream_reads) = @_;
+
+   my $tmp_fa = "tmp" . random_string() . "fa";
+
+   # Extract reads mapped facing downstream in given regions
+   my $mapped_command = "samtools view -q $qual_cutoff -f 0x11 -F 0x904 $bam_file " . join(" ", @$regions) .
+   " | cut -f 1,10 | sort > $mapped";
+   system($mapped_command);
+
+   system("cut -f 1 $mapped > $mapped_qnames");
+
+   # Get the pairs of these reads
+   my $paired_command = "samtools view $bam_file | grep -F -f $mapped_qnames | cut -f 1,10 | sort | comm -23 - $mapped > $downstream_reads";
+   system($paired_command);
+
+   # Reformat this as a fasta file
+   open(PAIRS, $downstream_reads) || die("Could not read $downstream_reads: $!\n");
+   open(FASTA, ">$tmp_fa") || die("Could not write to $tmp_fa: $!\n");
+
+   while (my $read = <PAIRS>)
+   {
+      chomp $read;
+      my ($read_name, $sequence) = split("\t", $read);
+
+      print FASTA ">$read_name\n$sequence\n";
+   }
+
+   close PAIRS;
+   close FASTA;
+
+   # Clear up files
+   rename $tmp_fa, $downstream_reads;
+
+   unlink $mapped, $mapped_qnames;
+}
+
+# Does a BLAT between a subject and query, and returns a hash of number of hits
+# on each subject sequence
+sub do_blat($$)
+{
+   my ($subject, $query) = @_;
+
+   my %blat_hits;
+   my $blat_out = "blat_out" . random_string() . ".psl";
+
+   # Do the BLAT
+   my $blat_command = "blat -noHead -out=blast8 -minIdentity=$blat_ident $subject $query $blat_out";
+   system($blat_command);
+
+   # Extract hit list
+   open(BLAT, $blat_out) || die("Could not open $blat_out: $!\n");
+   while (my $hit = <BLAT>)
+   {
+      chomp $hit;
+
+      my ($qseqid, $sseqid, $pident, $length, $mismatch, $gapopen, $qstart, $qend, $sstart, $send, $evalue, $bitscore) = split("\t", $hit);
+
+      $blat_hits{$sseqid}++;
+   }
+
+   close BLAT;
+   unlink $blat_out;
+
+   return(\%blat_hits);
+}
 
 #
 # Main
@@ -407,13 +527,52 @@ if (defined($help))
 }
 elsif (defined($map))
 {
+   #TODO make batch mode
+   print STDERR "Using mapping\n";
+
+   # Check input fastqs
+   if(!defined($forward_reads) || !defined($reverse_reads) || !-e $forward_reads || !-e $reverse_reads)
+   {
+      die("Must set forward and reverse reads for mapping mode\n");
+   }
+
+   $forward_reads =~ m/^(\d+_\d+)[#_](\d+)\.fastq$/;
+   my $output_prefix = "$1_$2";
+   my $output_bam = $output_prefix . ".bam";
+
+   # Map to D39 reference with bwa
+   bwa_mem($forward_reads, $reverse_reads, "$ref_dir/$ref_prefix", $output_bam);
+
+   # Extract downstream reads for 5' end
+   downstream_fasta($output_bam, @five_prime_regions, $five_prime_fasta);
+   # Extract downstream reads for 3' end
+   downstream_fasta($output_bam, @three_prime_regions, $three_prime_fasta);
+
+   # Do BLATs
+   my $five_prime_blat = do_blat("$ref_dir/$Nterm_D39_ref", $five_prime_fasta);
+   my $three_prime_blat = do_blat("$ref_dir/$Cterm_D39_ref", $three_prime_fasta);
+
+   # Print header for output
+   print STDERR "Number of mapped reads to each allele in hsdS\n";
+   print join("\t", "D39", "R6", "reads\n");
+
+   # Print output of blat hits
+   foreach my $N_allele (sort keys %$five_prime_blat)
+   {
+      print join("\t", $N_allele, $D39_to_R6{$N_allele}, $$five_prime_blat{$N_allele}) . "\n";
+   }
+
+   foreach my $C_allele (sort keys %$three_prime_blat)
+   {
+      print join("\t", $C_allele, $D39_to_R6{$C_allele}, $$five_prime_blat{$C_allele}) . "\n";
+   }
 
 }
 elsif (defined($assembly))
 {
    if (!defined($annotation_file_in) || !-e $annotation_file_in)
    {
-      die("Must set $annotation_file_in for assembly mode\n");
+      die("Must set --annotation for assembly mode\n");
    }
 
    print STDERR "Using assembly\n";
