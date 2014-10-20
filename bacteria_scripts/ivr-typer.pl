@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#
+
 use strict;
 use warnings;
 
@@ -8,9 +8,9 @@ use Getopt::Long;
 use Bio::SeqIO;
 use Bio::Tools::GFF;
 
-#
-# Globals
-#
+#*********************************************************************#
+#* Globals                                                           *#
+#*********************************************************************#
 
 # Mapping mode globals
 my $ref_prefix = "D39_v1.fa";
@@ -54,10 +54,13 @@ my %D39_to_R6 = ("1.1" => "A",
                  "2.2" => "c",
                  "2.3" => "b");
 
+#*********************************************************************#
+#* Help                                                              *#
+#*********************************************************************#
 my $help_message = <<HELP;
 Usage: ./ivr_typer.pl [--map|--assembly] <options>
 
-Given S. pneumo read (via mapping mode) or annotated assembly (via assembly mode),
+Given S. pneumo reads (via mapping mode) or annotated assembly (via assembly mode),
 returns information on the likely allele type for the ivr/hsd R-M system locus
 
 Using mapping mode will take around 800Mb memory for bam sorting, and around 5 mins
@@ -87,8 +90,12 @@ of CPU time for mapping
 
 HELP
 
-# Need to remove contigs with no features due to failings of Bio::Tools::GFF
-# used with attach_seqs
+#*********************************************************************#
+#* Subs                                                              *#
+#*********************************************************************#
+
+# Need to remove contigs with no features due to failings of
+# Bio::Tools::GFF used with attach_seqs
 # Should all be sorted by contig:position
 sub pre_process_gff($$)
 {
@@ -107,6 +114,8 @@ sub pre_process_gff($$)
    my @contigs;
    my $last_contig = "";
 
+   # Read in all contig sequences, but only add to @contigs if it has at least
+   # one feature
    while (my $feature = $gff_in->next_feature())
    {
       if ($feature->seq_id() ne $last_contig)
@@ -120,6 +129,7 @@ sub pre_process_gff($$)
 
    $gff_in->close();
 
+   # Write out contigs with features to a new fasta
    my $fasta_out = Bio::SeqIO->new( -file   => ">$fasta_tmp",
                                     -format => "fasta") || die("Could not write to $fasta_tmp: $!");
 
@@ -136,6 +146,9 @@ sub pre_process_gff($$)
 
    $fasta_out->close();
 
+   # Replace the sequence in the gff. Features and headers remain the same
+   #
+   # Equivalent command line
    #system("echo \"##FASTA\" | cat $gff_tmp - $fasta_tmp > $file_out");
    open(GFF, "$file_in") || die("Could not open $file_in\n");
    open(FASTA, "$fasta_tmp") || die("Could not open $fasta_tmp\n");
@@ -200,6 +213,8 @@ sub make_query_fasta($$$$)
    $sequence_out->close();
 }
 
+# Creates arrays for each gene of type, score (i.e. confidence that it is the hdsS gene)
+# in hsd locus, and sequence of hsdS genes
 sub extract_hsds($)
 {
    my ($annotation_file) = @_;
@@ -502,9 +517,9 @@ sub do_blat($$)
    return(\%blat_hits);
 }
 
-#
-# Main
-#
+#*********************************************************************#
+#* Main                                                              *#
+#*********************************************************************#
 my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file_in, $batch, $help);
 GetOptions ("map"       => \$map,
             "assembly"    => \$assembly,
@@ -577,6 +592,7 @@ elsif (defined($assembly))
 
    print STDERR "Using assembly\n";
 
+   # If multiple annotation files in batch mode, process an array of these
    my (@annotation_files, %sample_names);
    if (defined($batch))
    {
@@ -641,7 +657,7 @@ elsif (defined($assembly))
 
       make_query_fasta($hsds_genes, $scores, $sequences, $query_fasta);
 
-      # Run a protein blast for C and N termini
+      # Run a nucleotide blast for C and N termini
       my $N_term_blast = blastn("$ref_dir/$N_term_ref", $query_fasta, $N_blast_out);
       my $C_term_blast = blastn("$ref_dir/$C_term_ref", $query_fasta, $C_blast_out);
 
