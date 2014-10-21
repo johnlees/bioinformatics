@@ -69,8 +69,10 @@ Usage: ./ivr_typer.pl [--map|--assembly] <options>
 Given S. pneumo reads (via mapping mode) or annotated assembly (via assembly mode),
 returns information on the likely allele type for the ivr/hsd R-M system locus
 
-Using mapping mode will take around 800Mb memory for bam sorting, and around 5 mins
-of CPU time for mapping
+Using mapping mode will take around 1Gb memory for bam sorting, and around 5 mins
+of CPU time if mapping is required
+
+STDOUT can be piped to get tab separated output with a header
 
    Options
    --map                 Infer by mapping reads to reference alleles
@@ -81,6 +83,8 @@ of CPU time for mapping
                          (default ./)
 
    <map mode>
+   -m, --mapping         A bam file which already has reads mapped to the D39 ref
+   OR (to create the bam)
    -f, --forward_reads   Location of forward reads (fastq(.gz))
    -r, --reverse_reads   Location of reverse reads (fastq(.gz))
 
@@ -538,10 +542,11 @@ sub print_blat($$)
 #*********************************************************************#
 #* Main                                                              *#
 #*********************************************************************#
-my ($map, $assembly, $ref_dir, $forward_reads, $reverse_reads, $annotation_file_in, $batch, $help);
+my ($map, $assembly, $ref_dir, $input_bam, $forward_reads, $reverse_reads, $annotation_file_in, $batch, $help);
 GetOptions ("map"       => \$map,
             "assembly"    => \$assembly,
             "ref_dir=s" => \$ref_dir,
+            "mapping|m=s" => \$input_bam,
             "forward_reads|f=s" => \$forward_reads,
             "reverse_reads|r=s" => \$reverse_reads,
             "annotation|a=s" => \$annotation_file_in,
@@ -562,27 +567,31 @@ elsif (defined($map))
 {
    print STDERR "Using mapping\n";
 
-   # Check input fastqs
-   if(!defined($forward_reads) || !defined($reverse_reads) || !-e $forward_reads || !-e $reverse_reads)
+   # Map with bwa mem if bam doesn't exist
+   if(!defined($input_bam) || !-e $input_bam)
    {
-      die("Must set forward and reverse reads for mapping mode\n");
+      # Check input fastqs
+      if(!defined($forward_reads) || !defined($reverse_reads) || !-e $forward_reads || !-e $reverse_reads)
+      {
+         die("Must set forward and reverse reads for mapping mode with no bam\n");
+      }
+
+      my ($volume ,$directories, $file) = File::Spec->splitpath($forward_reads);
+      $file =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
+
+      $forward_reads =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
+      my $output_prefix = "$1_$2";
+      $input_bam = $output_prefix . ".bam";
+
+      # Map to D39 reference with bwa
+      bwa_mem($forward_reads, $reverse_reads, "$ref_dir/$ref_prefix", $input_bam);
    }
 
-   my ($volume ,$directories, $file) = File::Spec->splitpath($forward_reads);
-   $file =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
-
-   $forward_reads =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
-   my $output_prefix = "$1_$2";
-   my $output_bam = $output_prefix . ".bam";
-
-   # Map to D39 reference with bwa
-   bwa_mem($forward_reads, $reverse_reads, "$ref_dir/$ref_prefix", $output_bam);
-
    # Extract downstream reads for 5' end
-   downstream_fasta($output_bam, \@five_prime_regions, $five_prime_fasta);
+   downstream_fasta($input_bam, \@five_prime_regions, $five_prime_fasta);
    # Extract downstream reads for 3' end, 1.1 and 1.2 mapping separately
-   downstream_fasta($output_bam, \@three_prime_regionA, $three_prime_fasta_A);
-   downstream_fasta($output_bam, \@three_prime_regionB, $three_prime_fasta_B);
+   downstream_fasta($input_bam, \@three_prime_regionA, $three_prime_fasta_A);
+   downstream_fasta($input_bam, \@three_prime_regionB, $three_prime_fasta_B);
 
    # Do BLATs
    my $five_prime_blat = do_blat("$ref_dir/$Nterm_D39_ref", $five_prime_fasta);
