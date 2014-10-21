@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use File::Spec;
 
 use Bio::SeqIO;
 use Bio::Tools::GFF;
@@ -566,6 +567,9 @@ elsif (defined($map))
    {
       die("Must set forward and reverse reads for mapping mode\n");
    }
+
+   my ($volume ,$directories, $file) = File::Spec->splitpath($forward_reads);
+   $file =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
 
    $forward_reads =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
    my $output_prefix = "$1_$2";
