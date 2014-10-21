@@ -47,11 +47,11 @@ my $blast_evalue = "10e-6";
 
 # Conversion between naming conventions
 my %allele_map = ("Aa" => "A",
-                  "Ab" => "B",
-                  "Ac" => "E",
+                  "Ab" => "E",
+                  "Ac" => "B",
                   "Ba" => "D",
-                  "Bb" => "C",
-                  "Bc" => "F");
+                  "Bb" => "F",
+                  "Bc" => "C");
 
 my %D39_to_R6 = ("1.1" => "A",
                  "1.2" => "B",
@@ -524,13 +524,13 @@ sub do_blat($$)
 }
 
 # Prints number of reads mapped to each allele - works with do_blat return
-sub print_blat($)
+sub print_blat($$)
 {
-   my ($blat_results) = @_;
+   my ($blat_results, $map_region) = @_;
 
    foreach my $allele (sort keys %$blat_results)
    {
-      print join("\t", $allele, $D39_to_R6{$allele}, $$blat_results{$allele}) . "\n";
+      print join("\t", $map_region, $allele, $D39_to_R6{$allele}, $$blat_results{$allele}) . "\n";
    }
 }
 
@@ -587,16 +587,12 @@ elsif (defined($map))
 
    # Print header for output
    print STDERR "Number of mapped reads to each allele in hsdS\n";
-   print join("\t", "D39", "R6", "reads\n");
+   print join("\t", "Upstream", "D39", "R6", "reads\n");
 
    # Print output of blat hits
-   print_blat($five_prime_blat);
-
-   print STDERR "Mapping from 1.1 (A)\n";
-   print_blat($three_prime_blat_A);
-
-   print STDERR "Mapping from 1.2 (B)\n";
-   print_blat($three_prime_blat_B);
+   print_blat($five_prime_blat, "hsdM");
+   print_blat($three_prime_blat_A, "1.1");
+   print_blat($three_prime_blat_B, "1.2");
 
 }
 elsif (defined($assembly))
