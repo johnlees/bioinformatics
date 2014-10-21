@@ -20,13 +20,18 @@ my $Cterm_D39_ref = "Ctermini_D39.fasta";
 my $mapped = "mapped_reads.fa";
 my $mapped_qnames = "mapped_reads.qnames";
 my $five_prime_fasta = "5prime_pairs.fa";
-my $three_prime_fasta = "3prime_pairs.fa";
+my $three_prime_fasta_A = "3prime_pairs_A.fa";
+my $three_prime_fasta_B = "3prime_pairs_B.fa";
+
+my $bwa_err_file = "bwa.err";
 
 my $qual_cutoff = 60;
 my $blat_ident = 95;
 
 my @five_prime_regions = ("CP000410:462339-463896");
-my @three_prime_regions = ("CP000410:458072-458791", "CP000410:461520-462157");
+my @three_prime_regions = ("CP000410:461520-462157", "CP000410:458072-458791");
+my @three_prime_regionA = ($three_prime_regions[0]);
+my @three_prime_regionB = ($three_prime_regions[1]);
 
 # Assembly mode globals
 my $query_fasta_suffix = "hsdS_query.fa";
@@ -433,7 +438,7 @@ sub bwa_mem($$$$)
 
    my $bam_sort_prefix = "tmp" . random_string();
 
-   my $bwa_command = "bwa mem $reference $forward_reads $reverse_reads | samtools sort -O bam -o $output -T $bam_sort_prefix -";
+   my $bwa_command = "bwa mem $reference $forward_reads $reverse_reads 2>> $bwa_err_file | samtools sort -O bam -o $output -T $bam_sort_prefix -";
    system($bwa_command);
 
    system("samtools index $output");
@@ -497,7 +502,8 @@ sub do_blat($$)
    my $blat_out = "blat_out" . random_string() . ".psl";
 
    # Do the BLAT
-   my $blat_command = "blat -noHead -out=blast8 -minIdentity=$blat_ident $subject $query $blat_out";
+   # Send stdout to /dev/null which may not be ideal
+   my $blat_command = "blat -noHead -out=blast8 -minIdentity=$blat_ident $subject $query $blat_out > /dev/null";
    system($blat_command);
 
    # Extract hit list
@@ -515,6 +521,17 @@ sub do_blat($$)
    unlink $blat_out;
 
    return(\%blat_hits);
+}
+
+# Prints number of reads mapped to each allele - works with do_blat return
+sub print_blat($)
+{
+   my ($blat_results) = @_;
+
+   foreach my $allele (sort keys %$blat_results)
+   {
+      print join("\t", $allele, $D39_to_R6{$allele}, $$blat_results{$allele}) . "\n";
+   }
 }
 
 #*********************************************************************#
@@ -542,7 +559,6 @@ if (defined($help))
 }
 elsif (defined($map))
 {
-   #TODO make batch mode
    print STDERR "Using mapping\n";
 
    # Check input fastqs
@@ -551,7 +567,7 @@ elsif (defined($map))
       die("Must set forward and reverse reads for mapping mode\n");
    }
 
-   $forward_reads =~ m/^(\d+_\d+)[#_](\d+)\.fastq$/;
+   $forward_reads =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
    my $output_prefix = "$1_$2";
    my $output_bam = $output_prefix . ".bam";
 
@@ -559,28 +575,28 @@ elsif (defined($map))
    bwa_mem($forward_reads, $reverse_reads, "$ref_dir/$ref_prefix", $output_bam);
 
    # Extract downstream reads for 5' end
-   downstream_fasta($output_bam, @five_prime_regions, $five_prime_fasta);
-   # Extract downstream reads for 3' end
-   downstream_fasta($output_bam, @three_prime_regions, $three_prime_fasta);
+   downstream_fasta($output_bam, \@five_prime_regions, $five_prime_fasta);
+   # Extract downstream reads for 3' end, 1.1 and 1.2 mapping separately
+   downstream_fasta($output_bam, \@three_prime_regionA, $three_prime_fasta_A);
+   downstream_fasta($output_bam, \@three_prime_regionB, $three_prime_fasta_B);
 
    # Do BLATs
    my $five_prime_blat = do_blat("$ref_dir/$Nterm_D39_ref", $five_prime_fasta);
-   my $three_prime_blat = do_blat("$ref_dir/$Cterm_D39_ref", $three_prime_fasta);
+   my $three_prime_blat_A = do_blat("$ref_dir/$Cterm_D39_ref", $three_prime_fasta_A);
+   my $three_prime_blat_B = do_blat("$ref_dir/$Cterm_D39_ref", $three_prime_fasta_B);
 
    # Print header for output
    print STDERR "Number of mapped reads to each allele in hsdS\n";
    print join("\t", "D39", "R6", "reads\n");
 
    # Print output of blat hits
-   foreach my $N_allele (sort keys %$five_prime_blat)
-   {
-      print join("\t", $N_allele, $D39_to_R6{$N_allele}, $$five_prime_blat{$N_allele}) . "\n";
-   }
+   print_blat($five_prime_blat);
 
-   foreach my $C_allele (sort keys %$three_prime_blat)
-   {
-      print join("\t", $C_allele, $D39_to_R6{$C_allele}, $$five_prime_blat{$C_allele}) . "\n";
-   }
+   print STDERR "Mapping from 1.1 (A)\n";
+   print_blat($three_prime_blat_A);
+
+   print STDERR "Mapping from 1.2 (B)\n";
+   print_blat($three_prime_blat_B);
 
 }
 elsif (defined($assembly))
