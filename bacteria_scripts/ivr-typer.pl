@@ -30,7 +30,10 @@ my $qual_cutoff = 60;
 my $blat_ident = 95;
 
 my @five_prime_regions = ("CP000410:462339-463896");
+my $five_prime_direction = "downstream";
 my @three_prime_regions = ("CP000410:461520-462157", "CP000410:458072-458791");
+my $three_prime_directionA = "downstream";
+my $three_prime_directionB = "upstream";
 my @three_prime_regionA = ($three_prime_regions[0]);
 my @three_prime_regionB = ($three_prime_regions[1]);
 
@@ -457,27 +460,45 @@ sub random_string()
    return $string;
 }
 
-# Writes a fasta file of all read pairs lying downstream of mapped pairs in the
-# specified regions
-sub downstream_fasta($$$)
+# Writes a fasta file of all read pairs lying downstream (or upstream)
+# of mapped pairs in the specified regions
+sub pairs_fasta($$$$)
 {
-   my ($bam_file, $regions, $downstream_reads) = @_;
+   my ($bam_file, $regions, $direction, $reads_pairs_fasta) = @_;
 
    my $tmp_fa = "tmp" . random_string() . "fa";
 
    # Extract reads mapped facing downstream in given regions
-   my $mapped_command = "samtools view -q $qual_cutoff -f 0x11 -F 0x904 $bam_file " . join(" ", @$regions) .
+   my ($include_flag, $exclude_flag);
+   if ($direction eq "downstream")
+   {
+      $include_flag = "0x11";
+      $exclude_flag = "0x904";
+   }
+   elsif ($direction eq "upstream")
+   {
+      $include_flag = "0x1";
+      $exclude_flag = "0x914";
+   }
+   # Otherwise include both
+   else
+   {
+      $include_flag = "0x1";
+      $exclude_flag = "0x904";
+   }
+
+   my $mapped_command = "samtools view -q $qual_cutoff -f $include_flag -F $exclude_flag $bam_file " . join(" ", @$regions) .
    " | cut -f 1,10 | sort > $mapped";
    system($mapped_command);
 
    system("cut -f 1 $mapped > $mapped_qnames");
 
    # Get the pairs of these reads
-   my $paired_command = "samtools view $bam_file | grep -F -f $mapped_qnames | cut -f 1,10 | sort | comm -23 - $mapped > $downstream_reads";
+   my $paired_command = "samtools view $bam_file | grep -F -f $mapped_qnames | cut -f 1,10 | sort | comm -23 - $mapped > $reads_pairs_fasta";
    system($paired_command);
 
    # Reformat this as a fasta file
-   open(PAIRS, $downstream_reads) || die("Could not read $downstream_reads: $!\n");
+   open(PAIRS, $reads_pairs_fasta) || die("Could not read $reads_pairs_fasta: $!\n");
    open(FASTA, ">$tmp_fa") || die("Could not write to $tmp_fa: $!\n");
 
    while (my $read = <PAIRS>)
@@ -492,7 +513,7 @@ sub downstream_fasta($$$)
    close FASTA;
 
    # Clear up files
-   rename $tmp_fa, $downstream_reads;
+   rename $tmp_fa, $reads_pairs_fasta;
 
    unlink $mapped, $mapped_qnames;
 }
@@ -588,10 +609,10 @@ elsif (defined($map))
    }
 
    # Extract downstream reads for 5' end
-   downstream_fasta($input_bam, \@five_prime_regions, $five_prime_fasta);
+   pairs_fasta($input_bam, \@five_prime_regions, $five_prime_direction, $five_prime_fasta);
    # Extract downstream reads for 3' end, 1.1 and 1.2 mapping separately
-   downstream_fasta($input_bam, \@three_prime_regionA, $three_prime_fasta_A);
-   downstream_fasta($input_bam, \@three_prime_regionB, $three_prime_fasta_B);
+   pairs_fasta($input_bam, \@three_prime_regionA, $three_prime_directionA, $three_prime_fasta_A);
+   pairs_fasta($input_bam, \@three_prime_regionB, $three_prime_directionB, $three_prime_fasta_B);
 
    # Do BLATs
    my $five_prime_blat = do_blat("$ref_dir/$Nterm_D39_ref", $five_prime_fasta);
