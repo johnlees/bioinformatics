@@ -600,7 +600,6 @@ elsif (defined($map))
       my ($volume ,$directories, $file) = File::Spec->splitpath($forward_reads);
       $file =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
 
-      $forward_reads =~ m/^(\d+_\d+)[#_](\d+)_\d\.fastq/;
       my $output_prefix = "$1_$2";
       $input_bam = $output_prefix . ".bam";
 
