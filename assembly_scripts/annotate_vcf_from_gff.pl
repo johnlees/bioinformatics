@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use vcf_to_gff;
+use gff_to_vcf;
 
 # Headers for bcftools annotation
 my $annotation_headers = <<HEADER;
