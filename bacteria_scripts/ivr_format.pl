@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-my @columns = ("hsdM,1.1", "hsdM,1.2", "1.1,2.1", "1.1,2.2", "1.1,2.2", "1.2,2.1", "1.2,2.2", "1.2,2.2");
+my @columns = ("hsdM,1.1", "hsdM,1.2", "1.1,2.1", "1.1,2.2", "1.1,2.3", "1.2,2.1", "1.2,2.2", "1.2,2.3");
 
 open(SAMPLES, "../strep_pairs_lanes.txt") || die("Could not open lanes\n");
 
