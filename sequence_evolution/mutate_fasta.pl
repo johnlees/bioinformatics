@@ -8,12 +8,12 @@ use Getopt::Long;
 # Allows use of perl modules in ./
 use Cwd 'abs_path';
 use File::Basename;
-use lib dirname( abs_path $0 );
+use lib dirname( abs_path $0 ) . "/../assembly_scripts/";
 
 use assembly_common;
 
 my $help_message = <<HELP;
-Usage: ./mutate_fast.pl -f <fasta_file> -r <mutation_rate> -o <output_file> (-s <seed>) > mutations.txt
+Usage: ./mutate_fasta.pl -f <fasta_file> -r <mutation_rate> -o <output_file> (-s <seed>) > mutations.txt
 
 Creates SNPs in a multifasta using JC69 rate matrix
 Options:
