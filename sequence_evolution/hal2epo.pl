@@ -9,6 +9,8 @@ use warnings;
 
 use Getopt::Long;
 
+use Bio::SeqIO;
+
 #
 # Globals
 #
@@ -91,17 +93,18 @@ else
          my ($sequence, $start, $end, $mut_id, $par_genome, $child_genome) = split("\t", $snp_line);
 
          $mut_id =~ m/^S_([AGCT][AGCT])$/;
+         my $substitution = $1;
 
          # Add any non CpG muts to a count
-         if ($1 =~ /^[AT]/)
+         if ($substitution =~ /^[AT]/)
          {
-            $snp_counts{"norm"}{$1}++;
+            $snp_counts{"norm"}{$substitution}++;
          }
          # Count possible CpG sites later when looking through fasta
          else
          {
             push(@CG_snps, $end);
-            $snp_types{$end} = $1;
+            $snp_types{$end} = $substitution;
          }
       }
    }
