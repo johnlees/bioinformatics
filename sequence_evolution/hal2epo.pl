@@ -27,11 +27,14 @@ Usage: ./hal2epo.pl -f <reference_fasta> -h <hal_file> -n <ref_name> > output.lo
 Takes the mutations along a branch from anc0 to the given ref_name in a hal file, and converts
 them to an epo like format for use with mutate_bacteria.py
 Options:
-   -f --fasta    The reference used in the alignment, in fasta format
-   -h --hal      The hal file the alignment is stored in
-   -n --name     The name of the branch tip in the hal file to summarise
+   -f --fasta     The reference used in the alignment, in fasta format
+   -h --hal       The hal file the alignment is stored in
+   -n --name      The name of the branch tip in the hal file to summarise
 
-   -h --help     This help message
+   --interpolate  Linearly interpolate any missing indel lengths between the min and max
+                  observed
+
+   --help         This help message
 
 Prints log summary file to stdout and logs to stderr
 HELP
@@ -45,7 +48,7 @@ sub interpolate($$$$$)
 
    my $gradient = ($y2 - $y1)/($x2 - $x1);
 
-   my $y_int = $y1 + ($x_int-$x1) * $gradient;
+   my $y_int = sprintf("%0.f", $y1 + ($x_int-$x1) * $gradient);
 
    return ($y_int);
 }
@@ -56,10 +59,11 @@ sub interpolate($$$$$)
 
 # Read in options
 # Reference fasta, hal file, reference name in hal
-my ($fasta_file, $hal_file, $ref_name, $help);
+my ($fasta_file, $hal_file, $ref_name, $interpolate, $help);
 GetOptions ("fasta|f=s"  => \$fasta_file,
             "hal|h=s" => \$hal_file,
             "name|n=s"  => \$ref_name,
+            "interpolate" => \$interpolate,
             "help"     => \$help
 		   ) or die($help_message);
 
@@ -143,14 +147,22 @@ else
          # Check type of C/G SNPs i.e. if they are in a CpG site
          if ($i == $next_CG_snp-1)
          {
-            $next_CG_snp = shift(@CG_snps);
-            if (($snp_types{$i+1} eq "C" && $sequence_array[$i+1] eq "G") || ($snp_types{$i+1} eq "G" && $sequence_array[$i-1] eq "C"))
+            if (($snp_types{$i+1} =~ /^C/ && $sequence_array[$i+1] eq "G") || ($snp_types{$i+1} =~ /^G/ && $sequence_array[$i-1] eq "C"))
             {
                $snp_counts{"CpG"}{$snp_types{$i+1}}++;
             }
             else
             {
                $snp_counts{"norm"}{$snp_types{$i+1}}++;
+            }
+
+            if (scalar(@CG_snps))
+            {
+               $next_CG_snp = shift(@CG_snps);
+            }
+            else
+            {
+               $next_CG_snp = 0;
             }
          }
       }
@@ -160,7 +172,7 @@ else
 
    # Count number and length of each indel from hal output bed
    # Interpolate any missing length frequencies
-   open(SV, "$tmp_bed_prefix.snps.bed") || die("Could not open $tmp_bed_prefix.snps");
+   open(SV, "$tmp_bed_prefix.SV.bed") || die("Could not open $tmp_bed_prefix.SV");
 
    my %SV;
    while (my $sv_line = <SV>)
@@ -175,11 +187,11 @@ else
          my $SV_length = $end - $start;
          if ($mut_id eq "I")
          {
-            $SV{"insertion"}{$SV_length}++;
+            $SV{"insertions"}{$SV_length}++;
          }
          elsif ($mut_id eq "GI")
          {
-            $SV{"deletion"}{$SV_length}++;
+            $SV{"deletions"}{$SV_length}++;
          }
 
       }
@@ -188,36 +200,38 @@ else
    close SV;
 
    # Linear interpolation of indels
-   foreach my $sv_type (keys %SV)
+   if (defined($interpolate))
    {
-      my $i = 1;
-      my $last_length = 0;
-      foreach my $sv_length (sort {$a <=> $b} keys %{ $SV{$sv_type}})
+      foreach my $sv_type (keys %SV)
       {
-         while ($i < $sv_length)
+         my $i = 1;
+         my $last_length = 0;
+         foreach my $sv_length (sort {$a <=> $b} keys %{ $SV{$sv_type}})
          {
-            if (defined($last_length))
+            while ($i < $sv_length)
             {
-               $SV{$sv_type}{$i} = interpolate($i, $last_length, $SV{$sv_type}{$last_length}, $sv_length, $SV{$sv_type}{$sv_length});
-            }
-            else
-            {
-               $SV{$sv_type}{$i} = interpolate($i, 1, 0, $sv_length, $SV{$sv_type}{$sv_length});
-            }
+               if ($last_length != 0)
+               {
+                  $SV{$sv_type}{$i} = interpolate($i, $last_length, $SV{$sv_type}{$last_length}, $sv_length, $SV{$sv_type}{$sv_length});
+               }
+               else
+               {
+                  $SV{$sv_type}{$i} = interpolate($i, 1, 0, $sv_length, $SV{$sv_type}{$sv_length});
+               }
 
-            $i++;
+               $i++;
+            }
+            $last_length = $sv_length;
          }
-         $last_length = $sv_length;
       }
    }
-
    # Get number of aligned sites
    my $hal_snp_command = "$haltools_location/halSnps $hal_file $ref_name Anc0";
    my @orthologous_sites = split(" ", `$hal_snp_command`);
 
    # An estimate of CpG aligned sites
    # TODO: is there a better way of getting this from the hal?
-   my $aligned_cpg = sprintf("%f.0", $base_count{CpG} * ($orthologous_sites[2]/$length));
+   my $aligned_cpg = sprintf("%.0f", $base_count{CpG} * ($orthologous_sites[2]/$length));
    my $CpG_snps;
    foreach my $CpG_header (@CpG_headers)
    {
@@ -263,7 +277,7 @@ else
 
    # Now print insertions, using interpolation of any missing lengths up to the max
    # observed length
-   foreach my $sv_type (keys %SV)
+   foreach my $sv_type (reverse sort keys %SV)
    {
       print "##$sv_type\n";
       print "#len\tcount\n";
