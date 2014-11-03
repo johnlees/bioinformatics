@@ -34,6 +34,8 @@ Options:
    --interpolate  Linearly interpolate any missing indel lengths between the min and max
                   observed
 
+   --dirty        Do not clear up bed files produced by hal
+
    --help         This help message
 
 Prints log summary file to stdout and logs to stderr
@@ -59,11 +61,12 @@ sub interpolate($$$$$)
 
 # Read in options
 # Reference fasta, hal file, reference name in hal
-my ($fasta_file, $hal_file, $ref_name, $interpolate, $help);
+my ($fasta_file, $hal_file, $ref_name, $interpolate, $dirty, $help);
 GetOptions ("fasta|f=s"  => \$fasta_file,
             "hal|h=s" => \$hal_file,
             "name|n=s"  => \$ref_name,
             "interpolate" => \$interpolate,
+            "dirty" => \$dirty,
             "help"     => \$help
 		   ) or die($help_message);
 
@@ -289,7 +292,10 @@ else
    }
 
    # Clean up
-   unlink "$tmp_bed_prefix.SV.bed", "$tmp_bed_prefix.snps.bed";
+   unless ($dirty)
+   {
+      unlink "$tmp_bed_prefix.SV.bed", "$tmp_bed_prefix.snps.bed";
+   }
 }
 
 exit(0);
