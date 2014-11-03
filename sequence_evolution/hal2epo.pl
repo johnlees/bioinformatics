@@ -127,7 +127,7 @@ else
       # Go through each base
       my @sequence_array = split(//, $seq_string);
 
-      my $next_CG_snp = pop(@CG_snps);
+      my $next_CG_snp = shift(@CG_snps);
       for (my $i = 0; $i<scalar(@sequence_array); $i++)
       {
          # Base counts
@@ -143,7 +143,7 @@ else
          # Check type of C/G SNPs i.e. if they are in a CpG site
          if ($i == $next_CG_snp-1)
          {
-            $next_CG_snp = pop(@CG_snps);
+            $next_CG_snp = shift(@CG_snps);
             if (($snp_types{$i+1} eq "C" && $sequence_array[$i+1] eq "G") || ($snp_types{$i+1} eq "G" && $sequence_array[$i-1] eq "C"))
             {
                $snp_counts{"CpG"}{$snp_types{$i+1}}++;
@@ -217,7 +217,7 @@ else
 
    # An estimate of CpG aligned sites
    # TODO: is there a better way of getting this from the hal?
-   my $aligned_cpg = $base_count{CpG} * ($orthologous_sites[2]/$length);
+   my $aligned_cpg = sprintf("%f.0", $base_count{CpG} * ($orthologous_sites[2]/$length));
    my $CpG_snps;
    foreach my $CpG_header (@CpG_headers)
    {
@@ -275,7 +275,7 @@ else
    }
 
    # Clean up
-   unlink "$tmp_bed_prefix.SV.bed", " $tmp_bed_prefix.snps.bed";
+   unlink "$tmp_bed_prefix.SV.bed", "$tmp_bed_prefix.snps.bed";
 }
 
 exit(0);
