@@ -190,11 +190,11 @@ else
          my $SV_length = $end - $start;
          if ($mut_id eq "I")
          {
-            $SV{"insertions"}{$SV_length}++;
+            $SV{"INSERTIONS"}{$SV_length}++;
          }
          elsif ($mut_id eq "GI")
          {
-            $SV{"deletions"}{$SV_length}++;
+            $SV{"DELETIONS"}{$SV_length}++;
          }
 
       }
@@ -245,7 +245,7 @@ else
    print "##STATS\n";
 
    # Base counts
-   print join("\t", "#A", "C", "G", "T", "CpG\n");
+   print join("\t", "#A", "C", "G", "T", "CpGs\n");
    print join("\t", $base_count{A}, $base_count{C}, $base_count{G}, $base_count{T}, $base_count{CpG}) . "\n";
 
    # SNP counts
