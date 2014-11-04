@@ -188,7 +188,7 @@ else
          my ($sequence, $start, $end, $mut_id, $par_genome, $child_genome) = split("\t", $sv_line);
 
          my $SV_length = $end - $start;
-         if ($mut_id eq "I")
+         if ($mut_id eq "I" || $mut_id eq "P")
          {
             $SV{"INSERTIONS"}{$SV_length}++;
          }

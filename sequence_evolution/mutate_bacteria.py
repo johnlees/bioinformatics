@@ -178,7 +178,7 @@ totalrefC = float(totalrefC)
 totalrefG = float(totalrefG)
 totalrefT = float(totalrefT)
 
-bfreqs = [totalrefA/length,totalrefC/length,totalrefG/length,totalrefT/length]
+bfreqs = [totalrefA/total,totalrefC/total,totalrefG/total,totalrefT/total]
 
 ##SUBSTITUTION MATRIX NON-CpG
 GTR_nonCpG = {'A':[             0 , nAC/totalrefA , nAG/totalrefA , nAT/totalrefA ],
@@ -351,12 +351,11 @@ cmap.close()
 f.close()
 output.close()
 
-sys.stderr.write("Creating fasta with mutations\n")
 # Write a fasta with the mutations using GATK
 if options.fasta_out == True:
+  sys.stderr.write("Creating fasta with mutations\n")
   try:
     gatk_command = java_location + " -Xmx300M -jar " + gatk_location + " -R " + options.infile + " -T FastaAlternateReferenceMaker -o " + options.outfile + ".fa --variant " + options.outfile + ".vcf"
-    sys.stderr.write(gatk_command+"\n")
     retcode = subprocess.call(gatk_command, shell=True)
     if retcode < 0:
         print >>sys.stderr, "GATK was terminated by signal", -retcode
