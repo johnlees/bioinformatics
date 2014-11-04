@@ -31,7 +31,7 @@ def read_fasta_index(filename):
     fields = line.split()
     if len(fields) == 5:
       cname,length,start,line,cline = fields
-      res[cname]=int(length),int(start),int(line),int(cline)
+      res=cname,int(length),int(start),int(line),int(cline)
     else:
       sys.stderr.write('Error: Unexpected line in fasta index file: %s\n'%(line.strip()))
       sys.exit()
@@ -76,7 +76,6 @@ insertionsizes,deletionsizes = defaultdict(int),defaultdict(int)
 intervals = defaultdict(list)
 interval_vals = {}
 
-control_mut,control_mutCpG,control_total = 0,0,0
 try:
   infile = open(options.log_file)
   line = infile.readline()
@@ -147,8 +146,8 @@ except:
 sum_obs = float(totalrefA+totalrefC+totalrefG+totalrefT)
 total = float(total)
 totalCpG = float(totalCpG)
-sys.stderr.write("Total aligned positions: %d (Exp: %d)\n"%(sum_obs,control_total))
-sys.stderr.write("Total mutations: %d/%d (Exp: %d/%d); Rate: %.8f/%.8f\n"%(mut,mutCpG,control_mut,control_mutCpG,mut/total,mutCpG/totalCpG))
+sys.stderr.write("Total aligned positions: %d\n"%(sum_obs))
+sys.stderr.write("Total mutations: %d/%d; Rate: %.8f/%.8f\n"%(mut,mutCpG,mut/total,mutCpG/totalCpG))
 gmut = mut/total
 gmutCpG = mutCpG/totalCpG
 
@@ -167,6 +166,8 @@ totalrefA = float(totalrefA)
 totalrefC = float(totalrefC)
 totalrefG = float(totalrefG)
 totalrefT = float(totalrefT)
+
+bfreqs = [totalrefA/length,totalrefC/length,totalrefG/length,totalrefT/length]
 
 ##SUBSTITUTION MATRIX NON-CpG
 GTR_nonCpG = {'A':[             0 , nAC/totalrefA , nAG/totalrefA , nAT/totalrefA ],
@@ -233,7 +234,12 @@ VCFheader = """##fileformat=VCFv4.1
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"""
 output.write(VCFheader+"\n")
 
-length,sblock,bline,cline = fastaindex.pop()
+chrom,length,sblock,bline,cline = fastaindex
+
+if total > 1000: y = mut/float(total)
+else: y=gmut
+if totalCpG > 1000: yCpG = mutCpG/float(totalCpG)
+else: yCpG=gmutCpG
 
 #dmut, gmut, gdeletions (deletions), ginserts (inserts)
 lmut = y/gmut * dmut
