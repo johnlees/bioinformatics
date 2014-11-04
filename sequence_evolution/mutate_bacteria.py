@@ -78,7 +78,7 @@ interval_vals = {}
 
 control_mut,control_mutCpG,control_total = 0,0,0
 try:
-  infile = open(log_file)
+  infile = open(options.log_file)
   line = infile.readline()
   while line != "":
     if line == "#A\tC\tG\tT\tCpGs\n":
