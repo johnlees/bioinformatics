@@ -22,6 +22,10 @@ from optparse import OptionParser
 import traceback
 import random
 import mmap
+import subprocess
+
+java_location = "/software/bin/java"
+gatk_location = "~/software/bin/GenomeAnalysisTK.jar"
 
 # READ FASTA INDEX TO MEMORY
 def read_fasta_index(filename):
@@ -42,14 +46,21 @@ parser = OptionParser()
 parser.add_option("-n","--number_events", dest="number", help="Approximate number of substitution events to simulate (default 100)",type="int",default=100)
 parser.add_option("-l","--log_file",dest="log_file",help="The location of the log file produced by hal2epo.pl",default="bacteria.log")
 parser.add_option("-i", "--infile", dest="infile", help="Infile name of genome (prefix for fasta index, def reference_genome.fa)",default="reference_genome.fa")
-parser.add_option("-o", "--outfile", dest="outfile", help="Name of output file (def STDOUT)",default=None)
+parser.add_option("-o", "--outfile", dest="outfile", help="Prefix for output file (default STDOUT)",default=None)
+parser.add_option("-f", "--fasta", action="store_true", dest="fasta_out", help="Produce a fasta file with the mutations (default false)",default=False)
 (options, args) = parser.parse_args()
 
 # OPEN OUTPUT FILE IF GIVEN, OTHERWISE PRINT ON SCREEN
 if options.outfile != None:
-  output = open(options.outfile,'w')
+  output = open(options.outfile+".vcf",'w')
 else:
   output = sys.stdout
+
+if options.fasta_out == True:
+  if options.outfile == None:
+    sys.stderr.write("To write a fasta out, an outfile -o must be specified")
+  else:
+    fasta_out_path = options.outfile+".fa"
 
 if not os.path.exists(options.infile) or not os.path.exists(options.infile+".fai"):
   sys.stderr.write("Invalid path for genome and genome fasta index file.\n")
@@ -231,7 +242,7 @@ sys.stderr.write('Iterating over genome...\n')
 
 VCFheader = """##fileformat=VCFv4.1
 ##INFO=<ID=CpG,Number=0,Type=Flag,Description="Position was mutated in a CpG dinucleotide context.">
-#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"""
+#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\torig\tmutant"""
 output.write(VCFheader+"\n")
 
 chrom,length,sblock,bline,cline = fastaindex
@@ -274,7 +285,7 @@ for pos in xrange(2,length-1):
         if alt != base:
           whichmut-=GTR_CpG[base][i]
           if whichmut < 0:
-            output.write("%s\t%d\t.\t%s\t%s\t.\t.\tCpG\t.\n"%(chrom,pos,base,alt))
+            output.write("%s\t%d\t.\t%s\t%s\t.\t.\tCpG\tGT\t0\t1\n"%(chrom,pos,base,alt))
             break
   # GTR mutations
   elif base in "ACGT":
@@ -284,7 +295,7 @@ for pos in xrange(2,length-1):
         if alt != base:
           whichmut-=GTR_nonCpG[base][i]
           if whichmut < 0:
-            output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\t.\n"%(chrom,pos,base,alt))
+            output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\tGT\t0\t1\n"%(chrom,pos,base,alt))
             break
   else:
     #sys.stderr.write("Base %s on %s %d can not be mutated. Skipping.\n"%(base,chrom,pos))
@@ -312,7 +323,7 @@ for pos in xrange(2,length-1):
           else:
             break
         if len(delseq) == dellength:
-          output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\t.\n"%(chrom,pos,base+delseq,base))
+          output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\tGT\t0\t1\n"%(chrom,pos,base+delseq,base))
         break
 
   isindel = random.random()
@@ -333,8 +344,21 @@ for pos in xrange(2,length-1):
             if whichbase <= 0:
               insseq += newbase
               break
-        output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\t.\n"%(chrom,pos,base,base+insseq))
+        output.write("%s\t%d\t.\t%s\t%s\t.\t.\t.\tGT\t0\t1\n"%(chrom,pos,base,base+insseq))
         break
 
 cmap.close()
 f.close()
+output.close()
+
+sys.stderr.write("Creating fasta with mutations\n")
+# Write a fasta with the mutations using GATK
+if options.fasta_out == True:
+  try:
+    gatk_command = java_location + " -Xmx300M -jar " + gatk_location + " -R " + options.infile + " -T FastaAlternateReferenceMaker -o " + options.outfile + ".fa --variant " + options.outfile + ".vcf"
+    sys.stderr.write(gatk_command+"\n")
+    retcode = subprocess.call(gatk_command, shell=True)
+    if retcode < 0:
+        print >>sys.stderr, "GATK was terminated by signal", -retcode
+  except OSError as e:
+    print >>sys.stderr, "Execution failed:", e
