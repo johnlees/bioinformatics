@@ -271,12 +271,12 @@ else
 
    # Merge bams
    # Sample array is in the same order as bam file name array
-   print STDERR "bam merge...\n";
+   print STDERR "bam merge...\n\n";
    my $merged_bam = "$output_prefix.merged.bam";
    merge_bams($samples, \@bam_files, $merged_bam);
 
    # Call variants, running mpileup and then calling through a pipe
-   print STDERR "variant calling...\n";
+   print STDERR "variant calling...\n\n";
    my $calling_command;
    my $output_vcf = "$output_prefix.vcf.gz";
 
