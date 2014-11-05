@@ -49,6 +49,9 @@ Maps input reads to reference, and calls snps
    -o, --output        Prefix for output files
 
    -m, --mapper        Choose snap, bwa or smalt. Default snap
+   --gatk              Use gatk to improve bams (realign around indels)
+                       (recommended!)
+
    -t, --threads       Number of threads to use. Default 1
    -p, --prior         Prior for number of snps expected. Default 1e-3
 
@@ -62,45 +65,6 @@ USAGE
 #****************************************************************************************#
 #* Subs                                                                                 *#
 #****************************************************************************************#
-
-# Converts sam to bam, sorts and indexes bam, deletes sam
-# Returns name of bam
-sub sort_sam($)
-{
-   my ($sam_file) = @_;
-
-   # Set up file names
-   my ($volume ,$directories, $file) = File::Spec->splitpath($sam_file);
-   $file =~ m/^(.+)\.sam$/;
-   my $file_prefix = $1;
-
-   my $bam_file = $file_prefix . ".bam";
-
-   # Do sorting and conversion (requires directory for temporary files
-   my $tmp_prefix = "tmp" . assembly_common::random_string() . $file_prefix;
-   my $sort_command = "samtools sort -O bam -o $bam_file -T $tmp_prefix $sam_file";
-
-   if (!-d "tmp")
-   {
-      mkdir "tmp" || die("Could not make directory tmp: $!\n");
-   }
-
-   print STDERR "$sort_command\n";
-   system($sort_command);
-
-   # Always remove sam file immediately as it can be derived from bam, and it
-   # is huge
-   unlink $sam_file;
-
-   # Index
-   system("samtools index $bam_file");
-
-   # Add tmp files
-   assembly_common::add_tmp_file($bam_file);
-   assembly_common::add_tmp_file("$bam_file.bai");
-
-   return($bam_file);
-}
 
 # Takes a list of bams and their sample ids and merges them into a single bam
 sub merge_bams($$$)
@@ -140,7 +104,7 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $mapper, $dirty, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $mapper, $gatk, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
@@ -148,6 +112,7 @@ GetOptions ("assembly|a=s"  => \$reference_file,
             "threads|t=i" => \$threads,
             "prior|p=s"  => \$prior,
             "mapper|m=s" => \$mapper,
+            "gatk" => \$gatk,
             "dirty" => \$dirty,
             "help|h"     => \$help
 		   ) or die($usage_message);
@@ -211,7 +176,7 @@ else
    my @bam_files;
    print STDERR "Now mapping...\n\n";
 
-     # Create references and remove reference tmp files
+   # Create references and remove reference tmp files
    if ($smalt)
    {
       mapping::smalt_index($reference_file);
@@ -236,6 +201,7 @@ else
       assembly_common::add_tmp_file("snap_index");
    }
 
+   # Actually do mapping, using threads
    for (my $i=0; $i<scalar(@$samples); $i+=$threads)
    {
       my @map_threads;
@@ -264,9 +230,27 @@ else
       # Wait for threads to rejoin before starting more
       foreach my $map_thread (@map_threads)
       {
-         push (@bam_files, $map_thread->join());
+         my $bam_name = $map_thread->join();
+         push (@bam_files, $bam_name);
+
+         assembly_common::add_tmp_file($bam_name);
       }
 
+   }
+
+   # Use gatk to improve bams
+   # This is done serially as processing time is short but mem use is large
+   if (defined($gatk))
+   {
+      mapping::create_fa_dict($reference_file);
+      foreach my $bam (@bam_files)
+      {
+         mapping::mark_dups($bam);
+         assembly_common::add_tmp_file("$ref_name.dict");
+
+         mapping::indel_realign($reference_file, $bam);
+         assembly_common::add_tmp_file("$bam.intervals");
+      }
    }
 
    # Merge bams

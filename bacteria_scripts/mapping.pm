@@ -5,6 +5,15 @@ package mapping;
 use strict;
 use warnings;
 
+#
+# Globals
+#
+
+# Software locations
+my $java_location = "/software/bin/java";
+my $picard_location = "/nfs/users/nfs_j/jl11/software/bin/picard.jar";
+my $gatk_location = "/nfs/users/nfs_j/jl11/software/bin/GenomeAnalysisTK.jar";
+
 # Smalt parameters
 my $smalt_k = 13;
 my $smalt_s = 6;
@@ -35,7 +44,7 @@ sub sort_bam($)
    rename $tmp_bam, $bam_file;
 }
 
-# Run bwa mem, producing sorted and indexed bam. Returns location of this bam
+# Run snap, producing sorted and indexed bam. Returns location of this bam
 sub run_snap($$$$)
 {
    my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
@@ -50,7 +59,7 @@ sub run_snap($$$$)
    my $output_name_tmp = $output_name . random_string();
    my $log_file = "$sample_name.mapping.log";
 
-   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' -=";
+   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' -= &>> $log_file";
    system($snap_command);
 
    system("samtools fixmate -O bam $output_name $output_name_tmp");
@@ -63,6 +72,7 @@ sub run_snap($$$$)
    return($output_name);
 }
 
+# Make hash for snap (~15x genome size)
 sub snap_index($)
 {
    my ($reference_name) = @_;
@@ -72,7 +82,7 @@ sub snap_index($)
       mkdir "snap_index";
    }
 
-   system("$snap_location index $reference_name snap_index -large");
+   system("$snap_location index $reference_name snap_index -large 1>&2");
 }
 
 # Run bwa mem, producing sorted and indexed bam. Returns location of this bam
@@ -98,6 +108,7 @@ sub bwa_mem($$$$)
    return($output_name);
 }
 
+# Make bwa index
 sub bwa_index($)
 {
    my ($reference_name) = @_;
@@ -128,11 +139,64 @@ sub run_smalt($$$$)
    return($output_name);
 }
 
+# Make smalt index/hash
 sub smalt_index($)
 {
    my ($reference_name) = @_;
 
    system("smalt index -k $smalt_k -s $smalt_s $reference_name $reference_name");
+}
+
+# Creates a .dict file for a fasta. Required for any picard or GATK modules to
+# work with a fasta
+sub create_fa_dict($)
+{
+   my ($fasta_file) = @_;
+
+   $fasta_file =~ m/^(.+)\.(fasta|fa)$/;
+   my $ref_name = $1;
+
+   my $dict_command = "$java_location -Xmx100M -jar $picard_location CreateSequenceDictionary R=$fasta_file O=$ref_name.dict";
+   system($dict_command);
+}
+
+# Uses picard to mark PCR duplicates (if any)
+sub mark_dups($)
+{
+   my ($bam_file) = @_;
+
+   my $dup_file = "$bam_file.dups";
+   my $marked_bam = random_string() . "marked.$bam_file";
+
+   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file";
+
+   rename $marked_bam, $bam_file;
+}
+
+# Realigns bam files around indels
+sub indel_realign($$)
+{
+   my ($reference_file, $bam_file) = @_;
+
+   $reference_file =~ m/^(.+)\.(fasta|fa)$/;
+   my $ref_name = $1;
+
+   # Create dict if it doesn't already exist
+   if (!-e "$ref_name.dict")
+   {
+      create_fa_dict($reference_file);
+   }
+
+   # Create targets for realignment
+   my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals";
+   system($interval_command);
+
+   # Actually do realignment
+   my $realigned_bam = random_string() . "realigned.$bam_file";
+   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam";
+   system($realign_command);
+
+   rename $realigned_bam, $bam_file;
 }
 
 1;
