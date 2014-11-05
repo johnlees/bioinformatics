@@ -222,15 +222,15 @@ else
 
          if ($smalt)
          {
-            push(@map_threads, threads->create(\&mapping::run_smalt, $ref_name, $sample, $forward_reads, $reverse_reads));
+            push(@map_threads, threads->create(\&mapping::run_smalt, $reference_file, $sample, $forward_reads, $reverse_reads));
          }
          elsif ($bwa)
          {
-            push(@map_threads, threads->create(\&mapping::bwa_mem, $ref_name, $sample, $forward_reads, $reverse_reads));
+            push(@map_threads, threads->create(\&mapping::bwa_mem, $reference_file, $sample, $forward_reads, $reverse_reads));
          }
          elsif ($snap)
          {
-            push(@map_threads, threads->create(\&mapping::run_snap, $ref_name, $sample, $forward_reads, $reverse_reads));
+            push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads));
          }
 
          assembly_common::add_tmp_file("$sample.mapping.log");
