@@ -42,6 +42,14 @@ sub effective_coverage($$$)
    return($effective_coverage);
 }
 
+# Returns an 8 character string of random alphanumeric characters
+sub random_string()
+{
+   my $string = join'', map +(0..9,'a'..'z','A'..'Z')[rand(10+26*2)], 1..8;
+
+   return $string;
+}
+
 # Extracts read length from a fastq file (assuming all are the same length)
 sub read_length($)
 {

@@ -3,11 +3,18 @@
 use strict;
 use warnings;
 
+# Allows use of perl modules in ./
+use Cwd 'abs_path';
+use File::Basename;
+use lib dirname( abs_path $0 );
+
 use Getopt::Long;
 use File::Spec;
 
 use Bio::SeqIO;
 use Bio::Tools::GFF;
+
+use mapping;
 
 #*********************************************************************#
 #* Globals                                                           *#
@@ -23,8 +30,6 @@ my $mapped_qnames = "mapped_reads.qnames";
 my $five_prime_fasta = "5prime_pairs.fa";
 my $three_prime_fasta_A = "3prime_pairs_A.fa";
 my $three_prime_fasta_B = "3prime_pairs_B.fa";
-
-my $bwa_err_file = "bwa.err";
 
 my $qual_cutoff = 60;
 my $blat_ident = 95;
@@ -439,19 +444,6 @@ sub seg_to_letter($)
    return($term);
 }
 
-# Run bwa mem, producing sorted and indexed bam
-sub bwa_mem($$$$)
-{
-   my ($forward_reads, $reverse_reads, $reference, $output) = @_;
-
-   my $bam_sort_prefix = "tmp" . random_string();
-
-   my $bwa_command = "bwa mem $reference $forward_reads $reverse_reads 2>> $bwa_err_file | samtools sort -O bam -o $output -T $bam_sort_prefix -";
-   system($bwa_command);
-
-   system("samtools index $output");
-}
-
 # Returns an 8 character string of random alphanumeric characters
 sub random_string()
 {
@@ -604,7 +596,8 @@ elsif (defined($map))
       $input_bam = $output_prefix . ".bam";
 
       # Map to D39 reference with bwa
-      bwa_mem($forward_reads, $reverse_reads, "$ref_dir/$ref_prefix", $input_bam);
+      my $bam_name = mapping::bwa_mem("$ref_dir/$ref_prefix", $output_prefix, $forward_reads, $reverse_reads);
+      rename $bam_name, $input_bam;
    }
 
    # Extract downstream reads for 5' end

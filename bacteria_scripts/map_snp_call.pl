@@ -20,18 +20,13 @@ use lib dirname( abs_path $0 ) . "/../assembly_scripts";
 use quake_wrapper;
 use gff_to_vcf;
 use assembly_common;
+use mapping;
 
 use threads;
 
 #
 # Globals
 #
-
-# Smalt parameters
-my $smalt_k = 13;
-my $smalt_s = 6;
-
-my $smalt_max_insert = 750;
 
 # htslib parameters
 my $max_depth = 1000;
@@ -53,6 +48,7 @@ Maps input reads to reference, and calls snps
                        It is best to give absolute paths
    -o, --output        Prefix for output files
 
+   -m, --mapper        Choose snap, bwa or smalt. Default snap
    -t, --threads       Number of threads to use. Default 1
    -p, --prior         Prior for number of snps expected. Default 1e-3
 
@@ -66,23 +62,6 @@ USAGE
 #****************************************************************************************#
 #* Subs                                                                                 *#
 #****************************************************************************************#
-
-# Uses smalt to map paired end reads to an indexed reference. Returns the
-# location of the sam file produced
-sub run_smalt($$$$)
-{
-   my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
-
-   my $output_name = "$sample_name.mapping.sam";
-   my $log_file = "$sample_name.mapping.log";
-
-   my $smalt_command = "smalt map -f samsoft -i $smalt_max_insert -o $output_name $reference_name $forward_reads $reverse_reads &> $log_file";
-   system($smalt_command);
-
-   assembly_common::add_tmp_file($log_file);
-
-   return($output_name);
-}
 
 # Converts sam to bam, sorts and indexes bam, deletes sam
 # Returns name of bam
@@ -98,7 +77,8 @@ sub sort_sam($)
    my $bam_file = $file_prefix . ".bam";
 
    # Do sorting and conversion (requires directory for temporary files
-   my $sort_command = "samtools sort -O bam -o $bam_file -T /tmp/$file_prefix $sam_file";
+   my $tmp_prefix = "tmp" . assembly_common::random_string() . $file_prefix;
+   my $sort_command = "samtools sort -O bam -o $bam_file -T $tmp_prefix $sam_file";
 
    if (!-d "tmp")
    {
@@ -160,13 +140,14 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $dirty, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $mapper, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
             "output|o=s" => \$output_prefix,
             "threads|t=i" => \$threads,
             "prior|p=s"  => \$prior,
+            "mapper|m=s" => \$mapper,
             "dirty" => \$dirty,
             "help|h"     => \$help
 		   ) or die($usage_message);
@@ -182,6 +163,28 @@ elsif (!defined($reference_file) || !defined($annotation_file) || !defined($read
 }
 else
 {
+   # Set mapper
+   my ($smalt, $bwa, $snap);
+   if (defined($mapper))
+   {
+      if ($mapper eq "bwa")
+      {
+         $bwa = 1;
+      }
+      elsif ($mapper eq "smalt")
+      {
+         $smalt = 1;
+      }
+      else
+      {
+         $snap = 1;
+      }
+   }
+   else
+   {
+      $snap = 1;
+   }
+
    # Set default threads
    if (!defined($threads))
    {
@@ -203,59 +206,71 @@ else
 
    $reference_file = $new_ref;
 
-   system("smalt index -k $smalt_k -s $smalt_s $ref_name $reference_file");
-   assembly_common::add_tmp_file("$ref_name.sma");
-   assembly_common::add_tmp_file("$ref_name.smi");
-
    # Map read pairs to reference with smalt (output sam files). Use threads
    # where possible
-   my @sam_files;
+   my @bam_files;
+   print STDERR "Now mapping...\n";
 
    for (my $i=0; $i<scalar(@$samples); $i+=$threads)
    {
-      my @smalt_threads;
+      my @map_threads;
       for (my $thread = 1; $thread <= $threads; $thread++)
       {
          my $sample = $$samples[$i+$thread-1];
          my $forward_reads = $$reads{$sample}{"forward"};
          my $reverse_reads = $$reads{$sample}{"backward"};
 
-         push(@smalt_threads, threads->create(\&run_smalt, $ref_name, $sample, $forward_reads, $reverse_reads));
+         if ($smalt)
+         {
+            push(@map_threads, threads->create(\&mapping::run_smalt, $ref_name, $sample, $forward_reads, $reverse_reads));
+         }
+         elsif ($bwa)
+         {
+            push(@map_threads, threads->create(\&mapping::bwa_mem, $ref_name, $sample, $forward_reads, $reverse_reads));
+         }
+         elsif ($snap)
+         {
+            push(@map_threads, threads->create(\&mapping::run_snap, $ref_name, $sample, $forward_reads, $reverse_reads));
+         }
+
+         assembly_common::add_tmp_file("$sample.mapping.log");
       }
 
       # Wait for threads to rejoin before starting more
-      foreach my $smalt_thread (@smalt_threads)
+      foreach my $map_thread (@map_threads)
       {
-         push (@sam_files, $smalt_thread->join());
+         push (@bam_files, $map_thread->join());
       }
 
    }
 
-   # Convert sam to bam, and sort. Again, threading where possible
-   my @bam_files;
-   for (my $i=0,; $i<scalar(@sam_files); $i+=$threads)
+   # Remove reference tmp files
+   if ($smalt)
    {
-      my @sort_threads;
-      for (my $thread = 1; $thread <= $threads; $thread++)
-      {
-         push(@sort_threads, threads->create(\&sort_sam, $sam_files[$i+$thread-1]));
-      }
-
-      foreach my $sort_thread (@sort_threads)
-      {
-         push(@bam_files, $sort_thread->join());
-      }
+      assembly_common::add_tmp_file("$reference_file.sma");
+      assembly_common::add_tmp_file("$reference_file.smi");
    }
-
-   # Get rid of tmp directory from sorting
-   assembly_common::add_tmp_file("tmp");
+   elsif ($bwa)
+   {
+      assembly_common::add_tmp_file("$reference_file.amb");
+      assembly_common::add_tmp_file("$reference_file.ann");
+      assembly_common::add_tmp_file("$reference_file.bwt");
+      assembly_common::add_tmp_file("$reference_file.pac");
+      assembly_common::add_tmp_file("$reference_file.sa");
+   }
+   elsif ($snap)
+   {
+      assembly_common::add_tmp_file("snap_index");
+   }
 
    # Merge bams
    # Sample array is in the same order as bam file name array
+   print STDERR "bam merge...\n";
    my $merged_bam = "$output_prefix.merged.bam";
    merge_bams($samples, \@bam_files, $merged_bam);
 
    # Call variants, running mpileup and then calling through a pipe
+   print STDERR "variant calling...\n";
    my $calling_command;
    my $output_vcf = "$output_prefix.vcf.gz";
 
