@@ -30,6 +30,7 @@ use threads;
 
 # htslib parameters
 my $max_depth = 1000;
+my $indel_cov_lim = 1000;
 
 #
 # Help and usage
@@ -286,7 +287,7 @@ else
    }
    else
    {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
+      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -f $reference_file $merged_bam | bcftools call -vm -p -L $indel_cov_lim -S $sample_file -O z -o $output_vcf";
    }
 
    print STDERR "$calling_command\n";
