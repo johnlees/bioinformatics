@@ -50,7 +50,8 @@ sub run_snap($$$$)
    my $output_name_tmp = $output_name . random_string();
    my $log_file = "$sample_name.mapping.log";
 
-   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -so -sm 1 -R '" . join("\t", '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name");
+   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -so -sm 1 -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "'";
+   system($snap_command);
 
    system("samtools fixmate -O bam $output_name $output_name_tmp");
    rename $output_name_tmp, $output_name;
@@ -86,7 +87,7 @@ sub bwa_mem($$$$)
    my $output_name = "$sample_name.mapping.bam";
    my $log_file = "$sample_name.mapping.log";
 
-   my $bwa_command = "bwa mem -R '" . join("\t", '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
+   my $bwa_command = "bwa mem -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
    system($bwa_command);
 
    sort_bam($output_name);
