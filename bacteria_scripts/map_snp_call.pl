@@ -209,7 +209,32 @@ else
    # Map read pairs to reference with smalt (output sam files). Use threads
    # where possible
    my @bam_files;
-   print STDERR "Now mapping...\n";
+   print STDERR "Now mapping...\n\n";
+
+     # Create references and remove reference tmp files
+   if ($smalt)
+   {
+      mapping::smalt_index($reference_file);
+
+      assembly_common::add_tmp_file("$reference_file.sma");
+      assembly_common::add_tmp_file("$reference_file.smi");
+   }
+   elsif ($bwa)
+   {
+      mapping::bwa_index($reference_file);
+
+      assembly_common::add_tmp_file("$reference_file.amb");
+      assembly_common::add_tmp_file("$reference_file.ann");
+      assembly_common::add_tmp_file("$reference_file.bwt");
+      assembly_common::add_tmp_file("$reference_file.pac");
+      assembly_common::add_tmp_file("$reference_file.sa");
+   }
+   elsif ($snap)
+   {
+      mapping::snap_index($reference_file);
+
+      assembly_common::add_tmp_file("snap_index");
+   }
 
    for (my $i=0; $i<scalar(@$samples); $i+=$threads)
    {
@@ -242,25 +267,6 @@ else
          push (@bam_files, $map_thread->join());
       }
 
-   }
-
-   # Remove reference tmp files
-   if ($smalt)
-   {
-      assembly_common::add_tmp_file("$reference_file.sma");
-      assembly_common::add_tmp_file("$reference_file.smi");
-   }
-   elsif ($bwa)
-   {
-      assembly_common::add_tmp_file("$reference_file.amb");
-      assembly_common::add_tmp_file("$reference_file.ann");
-      assembly_common::add_tmp_file("$reference_file.bwt");
-      assembly_common::add_tmp_file("$reference_file.pac");
-      assembly_common::add_tmp_file("$reference_file.sa");
-   }
-   elsif ($snap)
-   {
-      assembly_common::add_tmp_file("snap_index");
    }
 
    # Merge bams

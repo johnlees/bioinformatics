@@ -43,8 +43,7 @@ sub run_snap($$$$)
    # Create index for reference if required
    if (!-d "snap_index")
    {
-      mkdir "snap_index";
-      system("$snap_location index $reference_name snap_index -large");
+      snap_index($reference_name);
    }
 
    my $output_name = "$sample_name.mapping.bam";
@@ -61,6 +60,17 @@ sub run_snap($$$$)
    return($output_name);
 }
 
+sub snap_index($)
+{
+   my ($reference_name) = @_;
+
+   if (!-d "snap_index")
+   {
+      mkdir "snap_index";
+   }
+
+   system("$snap_location index $reference_name snap_index -large");
+}
 
 # Run bwa mem, producing sorted and indexed bam. Returns location of this bam
 sub bwa_mem($$$$)
@@ -70,7 +80,7 @@ sub bwa_mem($$$$)
    # Create index for reference if required
    if (!-e "$reference_name.bwt")
    {
-      system("bwa index $reference_name");
+      bwa_index($reference_name);
    }
 
    my $output_name = "$sample_name.mapping.bam";
@@ -85,6 +95,13 @@ sub bwa_mem($$$$)
    return($output_name);
 }
 
+sub bwa_index($)
+{
+   my ($reference_name) = @_;
+
+   system("bwa index $reference_name");
+}
+
 # Uses smalt to map paired end reads to an indexed reference. Returns the
 # location of the sorted, indexed bam file produced
 sub run_smalt($$$$)
@@ -93,7 +110,7 @@ sub run_smalt($$$$)
 
    if (!-e "$reference_name.smi")
    {
-      system("smalt index -k $smalt_k -s $smalt_s $reference_name $reference_name");
+      smalt_index($reference_name);
    }
 
    my $output_name = "$sample_name.mapping.bam";
@@ -106,6 +123,13 @@ sub run_smalt($$$$)
    system("samtools index $output_name");
 
    return($output_name);
+}
+
+sub smalt_index($)
+{
+   my ($reference_name) = @_;
+
+   system("smalt index -k $smalt_k -s $smalt_s $reference_name $reference_name");
 }
 
 1;
