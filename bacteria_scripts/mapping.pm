@@ -186,6 +186,11 @@ sub indel_realign($$)
    {
       create_fa_dict($reference_file);
    }
+   # Create fasta index if it doesn't already exist
+   if (!-e "$reference_file.fai")
+   {
+      system("samtools faidx $reference_file");
+   }
 
    # Create targets for realignment
    my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals";

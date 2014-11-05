@@ -59,7 +59,9 @@ Maps input reads to reference, and calls snps
 
    -h, --help          Shows more detailed help.
 
-Requires: smalt, samtools, bcftools
+Requires: samtools, bcftools
+At least one of: smalt, bwa, snap
+Optional: picard, gatk
 USAGE
 
 #****************************************************************************************#
@@ -250,6 +252,7 @@ else
 
          mapping::indel_realign($reference_file, $bam);
          assembly_common::add_tmp_file("$bam.intervals");
+         assembly_common::add_tmp_file("$reference_file.fai");
       }
    }
 
