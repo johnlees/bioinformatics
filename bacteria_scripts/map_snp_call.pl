@@ -236,6 +236,7 @@ else
          push (@bam_files, $bam_name);
 
          assembly_common::add_tmp_file($bam_name);
+         assembly_common::add_tmp_file("$bam_name.bai");
       }
 
    }

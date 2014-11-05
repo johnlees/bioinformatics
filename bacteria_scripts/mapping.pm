@@ -11,6 +11,9 @@ use warnings;
 
 # Software locations
 my $java_location = "/software/bin/java";
+
+# Set java proxy for sanger cluster
+my $java_flags = "-DproxySet=true -Dhttp.proxyHost=wwwcache.sanger.ac.uk -Dhttp.proxyPort=3128";
 my $picard_location = "/nfs/users/nfs_j/jl11/software/bin/picard.jar";
 my $gatk_location = "/nfs/users/nfs_j/jl11/software/bin/GenomeAnalysisTK.jar";
 
@@ -21,6 +24,18 @@ my $smalt_s = 6;
 my $smalt_max_insert = 750;
 
 my $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
+
+my $hostname = `hostname`;
+chomp($hostname);
+
+# Set java flags on module load
+INIT
+{
+   if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/)
+   {
+      $java_location .= " $java_flags";
+   }
+}
 
 # Random string of 8 alphanumeric characters
 sub random_string()
@@ -202,6 +217,7 @@ sub indel_realign($$)
    system($realign_command);
 
    rename $realigned_bam, $bam_file;
+   rename "$realigned_bam.bai", "$bam_file.bai";
 }
 
 1;
