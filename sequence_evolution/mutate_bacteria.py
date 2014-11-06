@@ -48,6 +48,7 @@ parser.add_option("-l","--log_file",dest="log_file",help="The location of the lo
 parser.add_option("-i", "--infile", dest="infile", help="Infile name of genome (prefix for fasta index, def reference_genome.fa)",default="reference_genome.fa")
 parser.add_option("-o", "--outfile", dest="outfile", help="Prefix for output file (default STDOUT)",default=None)
 parser.add_option("-f", "--fasta", action="store_true", dest="fasta_out", help="Produce a fasta file with the mutations (default false)",default=False)
+parser.add_option("-s", "--seed", dest="seed", help="Seed for the random number generator (to generate the same mutations)",default=None)
 (options, args) = parser.parse_args()
 
 # OPEN OUTPUT FILE IF GIVEN, OTHERWISE PRINT ON SCREEN
@@ -65,6 +66,10 @@ if options.fasta_out == True:
 if not os.path.exists(options.infile) or not os.path.exists(options.infile+".fai"):
   sys.stderr.write("Invalid path for genome and genome fasta index file.\n")
   sys.exit()
+
+# Set seed if necessary
+if options.seed != None
+  random.seed(options.seed)
 
 fastaindex = read_fasta_index(options.infile+".fai")
 
