@@ -280,11 +280,18 @@ else
       assembly_common::add_tmp_file("$reference_file.fai");
    }
 
-   # Merge bams
+   # Merge bams if there are more than one of them
    # Sample array is in the same order as bam file name array
-   print STDERR "bam merge...\n\n";
    my $merged_bam = "$output_prefix.merged.bam";
-   merge_bams($samples, \@bam_files, $merged_bam);
+   if (scalar(@bam_files) > 1)
+   {
+      print STDERR "bam merge...\n\n";
+      merge_bams($samples, \@bam_files, $merged_bam);
+   }
+   else
+   {
+      rename $bam_files[0], $merged_bam;
+   }
 
    # Call variants, running mpileup and then calling through a pipe
    print STDERR "variant calling...\n\n";

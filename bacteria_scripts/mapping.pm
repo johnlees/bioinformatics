@@ -46,14 +46,21 @@ sub random_string()
 }
 
 # Sorts a given bam file to coordinate order
-sub sort_bam($)
+sub sort_bam($;$)
 {
-   my ($bam_file) = @_;
+   my ($bam_file, $threads) = @_;
 
    my $bam_sort_prefix = "tmp" . random_string();
    my $tmp_bam = random_string() . "$bam_file";
 
-   my $sort_command = "samtools sort -O bam -o $tmp_bam -T $bam_sort_prefix $bam_file";
+   # Do multithreaded if specified
+   my $sort_command = "samtools sort -O bam -o $tmp_bam -T $bam_sort_prefix ";
+   if (defined($threads) && $threads > 1)
+   {
+      $sort_command .= "-@ $threads ";
+   }
+   $sort_command .= "$bam_file";
+
    system($sort_command);
 
    rename $tmp_bam, $bam_file;
@@ -89,7 +96,7 @@ sub run_snap($$$$$)
    system("samtools fixmate -O bam $output_name $output_name_tmp");
    rename $output_name_tmp, $output_name;
 
-   sort_bam($output_name);
+   sort_bam($output_name, $threads);
 
    system("samtools index $output_name");
 
