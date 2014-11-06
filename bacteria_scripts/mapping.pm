@@ -16,6 +16,8 @@ my $java_location = "/software/bin/java";
 my $java_flags = "-DproxySet=true -Dhttp.proxyHost=wwwcache.sanger.ac.uk -Dhttp.proxyPort=3128";
 my $picard_location = "/nfs/users/nfs_j/jl11/software/bin/picard.jar";
 my $gatk_location = "/nfs/users/nfs_j/jl11/software/bin/GenomeAnalysisTK.jar";
+my $gatk_key_location = "/nfs/users/nfs_j/jl11/installations/jl11_sanger.ac.uk.key";
+my $gatk_key = "";
 
 # Smalt parameters
 my $smalt_k = 13;
@@ -25,7 +27,7 @@ my $smalt_max_insert = 750;
 
 my $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
 
-# Set java flags on module load
+# Set java flags on module load. Use GATK key to disable phone home
 INIT
 {
    my $hostname = `hostname`;
@@ -34,6 +36,7 @@ INIT
    if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/)
    {
       $java_location .= " $java_flags";
+      $gatk_location .= " -et NO_ET -K $gatk_key_location";
    }
 }
 

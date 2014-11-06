@@ -13,6 +13,7 @@ Chromosome options removed
 Lower default number of events
 No use of regions
 Use GATK to produce fasta files from the vcfs
+  Uses GATK key to disable phone home
 
 """
 
@@ -25,7 +26,8 @@ import mmap
 import subprocess
 
 java_location = "/software/bin/java"
-gatk_location = "~/software/bin/GenomeAnalysisTK.jar"
+gatk_location = "/nfs/users/nfs_j/jl11/software/bin/GenomeAnalysisTK.jar"
+gatk_key_location = "/nfs/users/nfs_j/jl11/installations/jl11_sanger.ac.uk.key"
 
 # READ FASTA INDEX TO MEMORY
 def read_fasta_index(filename):
@@ -361,7 +363,7 @@ output.close()
 if options.fasta_out == True:
   sys.stderr.write("Creating fasta with mutations\n")
   try:
-    gatk_command = str(java_location) + " -Xmx300M -jar " + str(gatk_location) + " -R " + str(options.infile) + " -T FastaAlternateReferenceMaker -o " + str(options.outfile) + ".fa --variant " + str(options.outfile) + ".vcf"
+    gatk_command = str(java_location) + " -Xmx300M -jar " + str(gatk_location) + " -R " + str(options.infile) + " -T FastaAlternateReferenceMaker -o " + str(options.outfile) + ".fa --variant " + str(options.outfile) + ".vcf -et NO_ET -K " + str(gatk_key_location)
     retcode = subprocess.call(gatk_command, shell=True)
     if retcode < 0:
         print >>sys.stderr, "GATK was terminated by signal", -retcode
