@@ -25,12 +25,12 @@ my $smalt_max_insert = 750;
 
 my $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
 
-my $hostname = `hostname`;
-chomp($hostname);
-
 # Set java flags on module load
 INIT
 {
+   my $hostname = `hostname`;
+   chomp($hostname);
+
    if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/)
    {
       $java_location .= " $java_flags";
@@ -189,9 +189,14 @@ sub mark_dups($)
 }
 
 # Realigns bam files around indels
-sub indel_realign($$)
+sub indel_realign($$$)
 {
-   my ($reference_file, $bam_file) = @_;
+   my ($reference_file, $bam_file, $threads) = @_;
+
+   if(!defined($threads) || $threads eq 0)
+   {
+      $threads = 1;
+   }
 
    $reference_file =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
@@ -208,12 +213,12 @@ sub indel_realign($$)
    }
 
    # Create targets for realignment
-   my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals";
+   my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals --num_threads $threads";
    system($interval_command);
 
    # Actually do realignment
    my $realigned_bam = random_string() . "realigned.$bam_file";
-   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam";
+   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam --num_threads $threads";
    system($realign_command);
 
    rename $realigned_bam, $bam_file;

@@ -244,6 +244,7 @@ else
 
    # Use gatk to improve bams
    # This is done serially as processing time is short but mem use is large
+   # GATK can use threads effectively itself
    if (defined($gatk))
    {
       mapping::create_fa_dict($reference_file);
@@ -252,7 +253,7 @@ else
          mapping::mark_dups($bam);
          assembly_common::add_tmp_file("$ref_name.dict");
 
-         mapping::indel_realign($reference_file, $bam);
+         mapping::indel_realign($reference_file, $bam, $threads);
          assembly_common::add_tmp_file("$bam.intervals");
          assembly_common::add_tmp_file("$reference_file.fai");
       }
