@@ -68,7 +68,7 @@ if not os.path.exists(options.infile) or not os.path.exists(options.infile+".fai
   sys.exit()
 
 # Set seed if necessary
-if options.seed != None
+if options.seed != None:
   random.seed(options.seed)
 
 fastaindex = read_fasta_index(options.infile+".fai")

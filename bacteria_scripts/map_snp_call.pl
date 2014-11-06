@@ -323,6 +323,7 @@ else
    system($calling_command);
 
    # Annotate variants
+   print STDERR "vcf annotation...\n\n";
    vcf_to_gff::transfer_annotation($annotation_file, $output_vcf);
 
    # Produced diff only vcf
@@ -340,6 +341,7 @@ else
    {
       assembly_common::clean_up();
    }
+   print STDERR "Done.\n";
 }
 
 exit(0);
