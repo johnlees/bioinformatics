@@ -363,7 +363,11 @@ output.close()
 if options.fasta_out == True:
   sys.stderr.write("Creating fasta with mutations\n")
   try:
-    gatk_command = str(java_location) + " -Xmx300M -jar " + str(gatk_location) + " -R " + str(options.infile) + " -T FastaAlternateReferenceMaker -o " + str(options.outfile) + ".fa --variant " + str(options.outfile) + ".vcf -et NO_ET -K " + str(gatk_key_location)
+    gatk_command = str(java_location) + " -Xmx300M -jar " + str(gatk_location) + " -R " + str(options.infile) + " -T FastaAlternateReferenceMaker -o " + str(options.outfile) + ".fa --variant " + str(options.outfile) + ".vcf"
+    
+    if os.path.exists(gatk_key_location):
+      gatk_command +=  " -et NO_ET -K " + str(gatk_key_location)
+
     retcode = subprocess.call(gatk_command, shell=True)
     if retcode < 0:
         print >>sys.stderr, "GATK was terminated by signal", -retcode
