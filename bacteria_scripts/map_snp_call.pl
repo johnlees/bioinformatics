@@ -247,6 +247,7 @@ else
    # GATK can use threads effectively itself
    if (defined($gatk))
    {
+      print STDERR "bam improvement...\n\n";
       mapping::create_fa_dict($reference_file);
       foreach my $bam (@bam_files)
       {
@@ -284,7 +285,7 @@ else
    # Use prior if given
    if (defined($prior))
    {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -f $reference_file $merged_bam | bcftools call -vm -P $prior -S $sample_file -O z -o $output_vcf";
+      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug --p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -P $prior -S $sample_file -O z -o $output_vcf";
    }
    else
    {

@@ -218,7 +218,7 @@ sub indel_realign($$$)
 
    # Actually do realignment
    my $realigned_bam = random_string() . "realigned.$bam_file";
-   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam --num_threads $threads";
+   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam";
    system($realign_command);
 
    rename $realigned_bam, $bam_file;
