@@ -54,6 +54,7 @@ Maps input reads to reference, and calls snps
                        (recommended!)
 
    -t, --threads       Number of threads to use. Default 1
+   --linear            Don't run mapping of each file simultaneously
    -p, --prior         Prior for number of snps expected. Default 1e-3
 
    --dirty             Don't remove temporary files
@@ -107,12 +108,13 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $mapper, $gatk, $dirty, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $linear, $mapper, $gatk, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
             "output|o=s" => \$output_prefix,
             "threads|t=i" => \$threads,
+            "linear" => \$linear,
             "prior|p=s"  => \$prior,
             "mapper|m=s" => \$mapper,
             "gatk" => \$gatk,
@@ -167,7 +169,6 @@ else
    my $new_ref = "reference.renamed.fa";
    assembly_common::standardise_contig_names($reference_file, $new_ref);
    assembly_common::add_tmp_file($new_ref);
-   assembly_common::add_tmp_file("$new_ref.fai");
 
    $new_ref =~ m/^(.+)\.(fasta|fa)$/;
    my $ref_name = $1;
@@ -204,11 +205,22 @@ else
       assembly_common::add_tmp_file("snap_index");
    }
 
+   # Thread mapping?
+   my $mapping_threads;
+   if ($linear)
+   {
+      $mapping_threads = 1;
+   }
+   else
+   {
+      $mapping_threads = $threads;
+   }
+
    # Actually do mapping, using threads
-   for (my $i=0; $i<scalar(@$samples); $i+=$threads)
+   for (my $i=0; $i<scalar(@$samples); $i+=$mapping_threads)
    {
       my @map_threads;
-      for (my $thread = 1; $thread <= $threads; $thread++)
+      for (my $thread = 1; $thread <= $mapping_threads; $thread++)
       {
          my $sample = $$samples[$i+$thread-1];
          my $forward_reads = $$reads{$sample}{"forward"};
@@ -224,7 +236,14 @@ else
          }
          elsif ($snap)
          {
-            push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads));
+            if (!$linear)
+            {
+               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
+            }
+            else
+            {
+               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
+            }
          }
 
          assembly_common::add_tmp_file("$sample.mapping.log");
@@ -249,15 +268,16 @@ else
    {
       print STDERR "bam improvement...\n\n";
       mapping::create_fa_dict($reference_file);
+
       foreach my $bam (@bam_files)
       {
          mapping::mark_dups($bam);
-         assembly_common::add_tmp_file("$ref_name.dict");
 
          mapping::indel_realign($reference_file, $bam, $threads);
          assembly_common::add_tmp_file("$bam.intervals");
-         assembly_common::add_tmp_file("$reference_file.fai");
       }
+      assembly_common::add_tmp_file("$ref_name.dict");
+      assembly_common::add_tmp_file("$reference_file.fai");
    }
 
    # Merge bams
@@ -285,11 +305,11 @@ else
    # Use prior if given
    if (defined($prior))
    {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug --p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -P $prior -S $sample_file -O z -o $output_vcf";
+      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -P $prior -S $sample_file -O z -o $output_vcf";
    }
    else
    {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug --p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
+      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
    }
 
    print STDERR "$calling_command\n";

@@ -60,9 +60,9 @@ sub sort_bam($)
 }
 
 # Run snap, producing sorted and indexed bam. Returns location of this bam
-sub run_snap($$$$)
+sub run_snap($$$$$)
 {
-   my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
+   my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads) = @_;
 
    # Create index for reference if required
    if (!-d "snap_index")
@@ -74,7 +74,16 @@ sub run_snap($$$$)
    my $output_name_tmp = $output_name . random_string();
    my $log_file = "$sample_name.mapping.log";
 
-   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' -= &>> $log_file";
+   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name");
+
+   # Use multiple cores if available
+   if ($threads > 1)
+   {
+      $snap_command .= " -t $threads -b";
+   }
+
+   $snap_command .=  "' -= &>> $log_file";
+
    system($snap_command);
 
    system("samtools fixmate -O bam $output_name $output_name_tmp");
@@ -221,8 +230,12 @@ sub indel_realign($$$)
    my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam";
    system($realign_command);
 
+   # Overwrite with output files
+   $realigned_bam =~ m/(.+)\.bam$/;
+   my $realigned_bam_index = "$1.bai";
+
    rename $realigned_bam, $bam_file;
-   rename "$realigned_bam.bai", "$bam_file.bai";
+   rename $realigned_bam_index, "$bam_file.bai";
 }
 
 1;
