@@ -36,6 +36,9 @@ INIT
    if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/)
    {
       $java_location .= " $java_flags";
+   }
+   if (-e $gatk_key_location)
+   {
       $gatk_location .= " -et NO_ET -K $gatk_key_location";
    }
 }
@@ -199,10 +202,12 @@ sub mark_dups($)
 {
    my ($bam_file) = @_;
 
+   my $log_file = "$bam_file.picard.log";
+
    my $dup_file = "$bam_file.dups";
    my $marked_bam = random_string() . "marked.$bam_file";
 
-   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file";
+   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file &> $log_file";
 
    rename $marked_bam, $bam_file;
 }
@@ -211,6 +216,8 @@ sub mark_dups($)
 sub indel_realign($$$)
 {
    my ($reference_file, $bam_file, $threads) = @_;
+
+   my $log_file = "$bam_file.gatk.log";
 
    if(!defined($threads) || $threads eq 0)
    {
@@ -232,12 +239,12 @@ sub indel_realign($$$)
    }
 
    # Create targets for realignment
-   my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals --num_threads $threads";
+   my $interval_command = "$java_location -Xmx2g -jar $gatk_location -T RealignerTargetCreator -R $reference_file -I $bam_file -o $bam_file.intervals --num_threads $threads &> $log_file";
    system($interval_command);
 
    # Actually do realignment
    my $realigned_bam = random_string() . "realigned.$bam_file";
-   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam";
+   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam &> $log_file";
    system($realign_command);
 
    # Overwrite with output files

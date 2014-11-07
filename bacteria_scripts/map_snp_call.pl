@@ -272,9 +272,11 @@ else
       foreach my $bam (@bam_files)
       {
          mapping::mark_dups($bam);
+         assembly_common::add_tmp_file("$bam.picard.log");
 
          mapping::indel_realign($reference_file, $bam, $threads);
          assembly_common::add_tmp_file("$bam.intervals");
+         assembly_common::add_tmp_file("$bam.gatk.log");
       }
       assembly_common::add_tmp_file("$ref_name.dict");
       assembly_common::add_tmp_file("$reference_file.fai");
