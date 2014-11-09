@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #
-# Uses htslib v1.0 to map two haploid samples fastq files to one of their
+# Uses htslib v1.1 to map haploid sample's fastq files to one of their
 # assemblies
 #
 
@@ -127,7 +127,7 @@ if (defined($help))
 {
    print $usage_message;
 }
-elsif (!defined($reference_file) || !defined($annotation_file) || !defined($read_file) || !defined($output_prefix))
+elsif (!defined($reference_file) || !defined($read_file) || !defined($output_prefix))
 {
    print STDERR $usage_message;
 }
@@ -325,18 +325,40 @@ else
    system($calling_command);
 
    # Annotate variants
-   print STDERR "vcf annotation...\n\n";
-   vcf_to_gff::transfer_annotation($annotation_file, $output_vcf);
+   if (defined($annotation_file) && -e $annotation_file)
+   {
+      print STDERR "vcf annotation...\n\n";
+      vcf_to_gff::transfer_annotation($annotation_file, $output_vcf);
+
+      # TODO: annotate frameshifts
+   }
 
    # Produced diff only vcf
-   my $min_ac = 1;
-   my $max_ac = scalar(@$samples) - 1;
-   my $diff_vcf_name = "$output_prefix.diff.vcf.gz";
-   system("bcftools view -c $min_ac -C $max_ac -o $diff_vcf_name -O z $output_vcf");
-   system("bcftools index -f $diff_vcf_name");
+   my $diff_vcf_name;
+   if (scalar(@$samples) > 1)
+   {
+      my $min_ac = 1;
+      my $max_ac = scalar(@$samples) - 1;
+      $diff_vcf_name = "$output_prefix.diff.vcf.gz";
+      system("bcftools view -c $min_ac -C $max_ac -o $diff_vcf_name -O z $output_vcf");
+      system("bcftools index -f $diff_vcf_name");
+   }
+   else
+   {
+      $diff_vcf_name = $output_vcf;
+   }
 
    # TODO: bcftools stats, plot-vcfstats, bcftools filter
-   #
+   $diff_vcf_name =~ m/(.+)\.vcf\.gz$/
+   my $diff_vcf_prefix = $1;
+
+   system("bcftools stats $diff_vcf_name");
+   system("plot-vcfstats $diff_vcf_prefix.vchk");
+
+   # pathogen informatics filters:
+   # depth < 4, depth_strand < 2, ratio < 0.75, quality < 50,
+   # map_quality < 30, af1 < 0.95, strand_bias  < 0.001,
+   # map_bias  < 0.001, tail_bias < 0.001
 
    # Remove temporary files
    unless(defined($dirty))

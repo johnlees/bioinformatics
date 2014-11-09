@@ -33,7 +33,7 @@ INIT
    my $hostname = `hostname`;
    chomp($hostname);
 
-   if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/)
+   if ($hostname =~ /^farm3/ || $hostname =~ /pcs5/ || $hostname =~ /^bc-\d+-\d+-\d+$/)
    {
       $java_location .= " $java_flags";
    }
