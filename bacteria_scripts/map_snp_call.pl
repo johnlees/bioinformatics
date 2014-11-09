@@ -14,8 +14,8 @@ use File::Spec;
 # Allows use of perl modules in ./
 use Cwd 'abs_path';
 use File::Basename;
-use lib dirname( abs_path $0 );
 use lib dirname( abs_path $0 ) . "/../assembly_scripts";
+use lib dirname( abs_path $0 );
 
 use quake_wrapper;
 use gff_to_vcf;
@@ -38,23 +38,29 @@ my $indel_cov_lim = 1000;
 my $usage_message = <<USAGE;
 Usage: ./map_snp_call.pl -r <reference.fasta> -a <reference_annotation.gff> -r <reads_file> -o <output_prefix>
 
-Maps input reads to reference, and calls snps
+Maps input reads to reference, calls and (optionally) annotates variants
 
    Options
+
+   Required
    -a, --assembly      Fasta file of reference to map to.
-   -g, --annotation    Annotation of the reference to annotate variants with.
    -r, --reads         Tab delimited file of fastq or fastq.gz file locations.
                        One line per sample. First column sample name, second
                        column forward reads, third column reverse reads.
                        It is best to give absolute paths
    -o, --output        Prefix for output files
 
+   Optional
+   -g, --annotation    Annotation of the reference to annotate variants with.
    -m, --mapper        Choose snap, bwa or smalt. Default snap
-   --gatk              Use gatk to improve bams (realign around indels)
-                       (recommended!)
+                       Speed: snap > bwa mem > smalt.
+                       Memory: bwa mem > smalt > snap
+   --no-gatk           Don't use gatk to improve bams (realign around indels)
 
    -t, --threads       Number of threads to use. Default 1
    --linear            Don't run mapping of each file simultaneously
+                       (recommended for snap)
+
    -p, --prior         Prior for number of snps expected. Default 1e-3
 
    --dirty             Don't remove temporary files
@@ -108,7 +114,7 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $linear, $mapper, $gatk, $dirty, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $linear, $mapper, $no_gatk, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
@@ -117,7 +123,7 @@ GetOptions ("assembly|a=s"  => \$reference_file,
             "linear" => \$linear,
             "prior|p=s"  => \$prior,
             "mapper|m=s" => \$mapper,
-            "gatk" => \$gatk,
+            "no-gatk" => \$no_gatk,
             "dirty" => \$dirty,
             "help|h"     => \$help
 		   ) or die($usage_message);
@@ -264,7 +270,7 @@ else
    # Use gatk to improve bams
    # This is done serially as processing time is short but mem use is large
    # GATK can use threads effectively itself
-   if (defined($gatk))
+   unless (defined($no_gatk))
    {
       print STDERR "bam improvement...\n\n";
       mapping::create_fa_dict($reference_file);
@@ -348,8 +354,11 @@ else
       $diff_vcf_name = $output_vcf;
    }
 
+   # TODO: normalise indels w/ bcftools norm
+
    # TODO: bcftools stats, plot-vcfstats, bcftools filter
-   $diff_vcf_name =~ m/(.+)\.vcf\.gz$/
+   # can also use frameshifts here
+   $diff_vcf_name =~ m/(.+)\.vcf\.gz$/;
    my $diff_vcf_prefix = $1;
 
    system("bcftools stats $diff_vcf_name");
@@ -363,6 +372,7 @@ else
    # Remove temporary files
    unless(defined($dirty))
    {
+      print STDERR "removing temporary files...\n\n";
       assembly_common::clean_up();
    }
    print STDERR "Done.\n";
