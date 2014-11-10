@@ -34,6 +34,14 @@ my $exons_file = "exons.tab";
 my $max_depth = 1000;
 my $indel_cov_lim = 1000;
 
+my $mpileup_C = 50;
+my $mpileup_m = 2;
+my $mpileup_L = 0.0005;
+
+# VCF filters
+my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"1\" && PL[1]/PL[0] > 0.75)", "QUAL < 50", "MQ < 30", "SP > 30", "MQB < 0.001", "RPB < 0.001");
+my @vcf_filter_names = ("DEPTH", "RATIO", "VAR_QUAL", "MAP_QUAL", "STRAND_BIAS", "MQ_BIAS", "RP_BIAS");
+
 #
 # Help and usage
 #
@@ -110,6 +118,36 @@ sub merge_bams($$$)
    # Add tmp files
    assembly_common::add_tmp_file($output_bam);
    assembly_common::add_tmp_file("$output_bam.bai");
+}
+
+# Apply a list of filters to a vcf, filling in the filter column
+sub filter_vcf($$$)
+{
+   my ($vcf_file, $vcf_filters, $vcf_filter_names) = @_;
+
+   my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
+   my @vcf_filter_names_new = map{ $_ .= "FAIL_"} @$vcf_filter_names;
+
+   my $filter_command = "";
+   foreach my $vcf_filter (@$vcf_filters)
+   {
+      my $filter_name = shift(@vcf_filter_names_new);
+
+      if ($filter_command eq "")
+      {
+         $filter_command .= "bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' $vcf_file";
+      }
+      else
+      {
+         $filter_command .= " | bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' -";
+      }
+   }
+
+   $filter_command .= " -O z -o $filtered_vcf";
+   system($filter_command);
+
+   rename $filtered_vcf, $vcf_file;
+   system("bcftools index -f $vcf_file");
 }
 
 #****************************************************************************************#
@@ -307,7 +345,6 @@ else
 
    # Call variants, running mpileup and then calling through a pipe
    print STDERR "variant calling...\n\n";
-   my $calling_command;
    my $output_vcf = "$output_prefix.vcf.gz";
 
    # Write a sample file, defining all as haploid
@@ -322,13 +359,10 @@ else
    assembly_common::add_tmp_file($sample_file);
 
    # Use prior if given
+   my $calling_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -L $mpileup_L -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
    if (defined($prior))
    {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -P $prior -S $sample_file -O z -o $output_vcf";
-   }
-   else
-   {
-      $calling_command = "samtools mpileup -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
+      $calling_command .= " -P $prior";
    }
 
    print STDERR "$calling_command\n";
@@ -350,6 +384,9 @@ else
       rename $frameshift_vcf, $output_vcf;
    }
 
+   # Filter variants
+   filter_vcf($output_vcf, \@vcf_filters, \@vcf_filter_names);
+
    # Produced diff only vcf
    my $diff_vcf_name;
    if (scalar(@$samples) > 1)
@@ -366,6 +403,7 @@ else
    }
 
    # normalise indels w/ bcftools norm
+   print STDERR "normalising and filtering vcf...\n\n";
    my $realigned_name = $diff_vcf_name . mapping::random_string();
    system("bcftools norm -f $reference_file -O z -o $realigned_name $diff_vcf_name");
 
@@ -376,6 +414,7 @@ else
    # can also use frameshifts here
    if (defined($stats))
    {
+      print STDERR "producing vcf stats...\n\n";
       $diff_vcf_name =~ m/(.+)\.vcf\.gz$/;
       my $stats_file = "$1.chk";
 
@@ -391,12 +430,6 @@ else
 
       system("plot-vcfstats -p $stats_dir_name $stats_file");
    }
-
-   # TODO: bcftools filter
-   # pathogen informatics filters:
-   # depth < 4, depth_strand < 2, ratio < 0.75, quality < 50,
-   # map_quality < 30, af1 < 0.95, strand_bias  < 0.001,
-   # map_bias  < 0.001, tail_bias < 0.001
 
    # Remove temporary files
    unless(defined($dirty))
