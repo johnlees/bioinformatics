@@ -98,10 +98,10 @@ sub variant_windows($$$$)
    my @found_variants;
    while (my $sequence = $sequence_in->next_seq())
    {
-
       foreach my $variant (@$variant_list)
       {
-         my ($contig, $position) = split(",", $variant);
+         my ($contig, $position, $ref, $alt) = split(",", $variant);
+
          if ($contig eq $sequence->display_id())
          {
             # Remove from variant list if found in this contig
@@ -179,11 +179,12 @@ sub create_blastn_input($$$)
    my $i = 1;
    foreach my $vcf (@$vcfs)
    {
-      my $variant_list = extract_vcf_variants($vcf);
-      variant_windows(300, $variant_list, shift(@$refs), "$out_prefix.$i.fa");
+      my $variant_lists = extract_vcf_variants($vcf);
+      variant_windows(300, $variant_lists, shift(@$refs), "$out_prefix.$i.fa");
 
       $i++;
    }
+
 }
 
 # Get a list of variant sites from a vcf
@@ -192,11 +193,10 @@ sub extract_vcf_variants($)
    my ($vcf_in) = @_;
 
    # Tab delimited contig, position list of all variants in vcf
-   my $bcftools_command = "$bcftools_location query -f '%CHROM\t%POS\n' $vcf_in";
+   my $bcftools_command = "$bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' $vcf_in";
    my $bcf_return = `$bcftools_command`;
 
-   # Create array with elements of the form 'contig,position' and return
-   # a reference to it
+   # Create a hash of variant details
    my @variant_list;
    foreach my $variant (split("\n", $bcf_return))
    {
