@@ -321,6 +321,7 @@ else
       {
          mapping::mark_dups($bam);
          assembly_common::add_tmp_file("$bam.picard.log");
+         assembly_common::add_tmp_file("$bam.dups");
 
          mapping::indel_realign($reference_file, $bam, $threads);
          assembly_common::add_tmp_file("$bam.intervals");
@@ -380,7 +381,7 @@ else
       assembly_common::add_tmp_file("$exons_file.gz.tbi");
 
       my $frameshift_vcf = mapping::random_string() . $output_vcf;
-      system("bcftools plugin frameshifts -O z -o $frameshift_vcf $output_vcf -- -e $exons_file");
+      system("bcftools plugin frameshifts -O z -o $frameshift_vcf $output_vcf -- -e $exons_file.gz");
       rename $frameshift_vcf, $output_vcf;
    }
 
