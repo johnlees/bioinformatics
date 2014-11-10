@@ -107,8 +107,32 @@ sub variant_windows($$$$)
             # Remove from variant list if found in this contig
             push (@found_variants, $variant);
 
+            # Variant length. 1 for a SNP, > 1 for an insertion, < 1 for
+            # a deletion
+            my $var_length = length($alt) - length($ref) + 1;
+            my ($position_start, $position_end);
+
+            # SNPs
+            if ($var_length == 1)
+            {
+               $position_start = $position - 1;
+               $position_end = $position + $var_length;
+            }
+            # Deletions
+            elsif ($var_length < 1)
+            {
+               $position_start = $position;
+               $position_end = $position - $var_length + 2;
+            }
+            # Insertions
+            else
+            {
+               $position_start = $position;
+               $position_end = $position + 1;
+            }
+
             # Extract the window, then write it to the output
-            my $window = extract_bp_window($sequence, $position, $window_size);
+            my $window = extract_bp_window($sequence, $window_size, $position_start, $position_end);
 
             $window->display_id($variant);
             $sequence_out->write_seq($window);
@@ -126,45 +150,46 @@ sub variant_windows($$$$)
 
 # Extracts sequence of a window size around a position, returning a Bio:Seq
 # object of this
-sub extract_bp_window($$$)
+sub extract_bp_window($$$;$)
 {
-   my ($sequence, $position, $window_size) = @_;
+   my ($sequence, $window_size, $position_start, $position_end) = @_;
 
-   # Window size must be odd, as we will extract a region symmetric around the
-   # variant
-   if ($window_size % 2 == 0)
+   # Window size must be evn, as we will extract a region symmetric around the
+   # variant not including it
+   if ($window_size % 2 != 0)
    {
       $window_size--;
    }
-   my $half_size = ($window_size - 1)/2;
+   my $half_size = ($window_size)/2;
 
    my ($window, $start, $end);
 
-   if ($sequence->length() < $window_size)
+   if ($sequence->length() < ($window_size + $position_end - $position_start))
    {
-      print STDERR "Cannot extract $window_size bp around $position as sequence too small\n";
+      print STDERR "Cannot extract $window_size bp around $position_start as sequence too small\n";
    }
    else
    {
-      if (($position + $half_size) > $sequence->length())
+      if (($position_end + $half_size) > $sequence->length())
       {
          # Extract from end backwards
-         $start = $sequence->length() - $window_size;
+         $start = $sequence->length() - ($window_size + $position_end - $position_start);
          $end = $sequence->length();
       }
-      elsif (($position - $half_size) <= 0)
+      elsif (($position_start - $half_size) <= 0)
       {
          # Extract from start forwards
          $start = 1;
-         $end = $window_size;
+         $end = $window_size + ($position_end - $position_start);
       }
       else
       {
-         $start = $position - $half_size;
-         $end = $position + $half_size;
+         $start = $position_start - $half_size + 1;
+         $end = $position_end + $half_size - 1;
       }
 
-      $window = Bio::Seq->new( -seq => $sequence->subseq($start, $end));
+      my $window_sequence = $sequence->subseq($start, $position_start) . $sequence->subseq($position_end, $end);
+      $window = Bio::Seq->new( -seq => $window_sequence);
    }
 
    return($window);
@@ -200,7 +225,7 @@ sub extract_vcf_variants($)
    my @variant_list;
    foreach my $variant (split("\n", $bcf_return))
    {
-      $variant =~ s/\t/,/;
+      $variant =~ s/\t/,/g;
       push (@variant_list, $variant);
    }
 
