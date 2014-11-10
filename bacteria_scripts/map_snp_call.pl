@@ -27,6 +27,8 @@ use threads;
 #
 # Globals
 #
+my $stats_dir_name = "stats/";
+my $exons_file = "exons.tab";
 
 # htslib parameters
 my $max_depth = 1000;
@@ -36,7 +38,7 @@ my $indel_cov_lim = 1000;
 # Help and usage
 #
 my $usage_message = <<USAGE;
-Usage: ./map_snp_call.pl -r <reference.fasta> -a <reference_annotation.gff> -r <reads_file> -o <output_prefix>
+Usage: ./map_snp_call.pl -r <reference.fasta> -r <reads_file> -o <output_prefix> <OPTIONS>
 
 Maps input reads to reference, calls and (optionally) annotates variants
 
@@ -56,6 +58,7 @@ Maps input reads to reference, calls and (optionally) annotates variants
                        Speed: snap > bwa mem > smalt.
                        Memory: bwa mem > smalt > snap
    --no-gatk           Don't use gatk to improve bams (realign around indels)
+   --stats             Produce plots of summary stats of the produced vcfs
 
    -t, --threads       Number of threads to use. Default 1
    --linear            Don't run mapping of each file simultaneously
@@ -114,13 +117,14 @@ sub merge_bams($$$)
 #****************************************************************************************#
 
 #* gets input parameters
-my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $prior, $linear, $mapper, $no_gatk, $dirty, $help);
+my ($reference_file, $annotation_file, $read_file, $output_prefix, $threads, $stats, $prior, $linear, $mapper, $no_gatk, $dirty, $help);
 GetOptions ("assembly|a=s"  => \$reference_file,
             "annotation|g=s" => \$annotation_file,
             "reads|r=s"  => \$read_file,
             "output|o=s" => \$output_prefix,
             "threads|t=i" => \$threads,
             "linear" => \$linear,
+            "stats" => \$stats,
             "prior|p=s"  => \$prior,
             "mapper|m=s" => \$mapper,
             "no-gatk" => \$no_gatk,
@@ -244,11 +248,11 @@ else
          {
             if (!$linear)
             {
-               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
+               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
             }
             else
             {
-               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
+               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
             }
          }
 
@@ -334,9 +338,16 @@ else
    if (defined($annotation_file) && -e $annotation_file)
    {
       print STDERR "vcf annotation...\n\n";
-      vcf_to_gff::transfer_annotation($annotation_file, $output_vcf);
+      gff_to_vcf::transfer_annotation($annotation_file, $output_vcf);
 
-      # TODO: annotate frameshifts
+      # annotate frameshifts
+      gff_to_vcf::create_exons_tab($annotation_file, $exons_file);
+      assembly_common::add_tmp_file("$exons_file.gz");
+      assembly_common::add_tmp_file("$exons_file.gz.tbi");
+
+      my $frameshift_vcf = mapping::random_string() . $output_vcf;
+      system("bcftools plugin frameshifts -O z -o $frameshift_vcf $output_vcf -- -e $exons_file");
+      rename $frameshift_vcf, $output_vcf;
    }
 
    # Produced diff only vcf
@@ -354,16 +365,34 @@ else
       $diff_vcf_name = $output_vcf;
    }
 
-   # TODO: normalise indels w/ bcftools norm
+   # normalise indels w/ bcftools norm
+   my $realigned_name = $diff_vcf_name . mapping::random_string();
+   system("bcftools norm -f $reference_file -O z -o $realigned_name $diff_vcf_name");
 
-   # TODO: bcftools stats, plot-vcfstats, bcftools filter
+   rename $realigned_name, $diff_vcf_name;
+   system("bcftools index -f $diff_vcf_name");
+
+   # bcftools stats, plot-vcfstats
    # can also use frameshifts here
-   $diff_vcf_name =~ m/(.+)\.vcf\.gz$/;
-   my $diff_vcf_prefix = $1;
+   if (defined($stats))
+   {
+      $diff_vcf_name =~ m/(.+)\.vcf\.gz$/;
+      my $stats_file = "$1.chk";
 
-   system("bcftools stats $diff_vcf_name");
-   system("plot-vcfstats $diff_vcf_prefix.vchk");
+      my $stats_command = "bcftools stats";
+      if (-e "$exons_file.gz")
+      {
+         $stats_command .= " -e $exons_file.gz";
+      }
+      $stats_command .= " $diff_vcf_name > $stats_file";
+      system($stats_command);
 
+      assembly_common::add_tmp_file($stats_file);
+
+      system("plot-vcfstats -p $stats_dir_name $stats_file");
+   }
+
+   # TODO: bcftools filter
    # pathogen informatics filters:
    # depth < 4, depth_strand < 2, ratio < 0.75, quality < 50,
    # map_quality < 30, af1 < 0.95, strand_bias  < 0.001,

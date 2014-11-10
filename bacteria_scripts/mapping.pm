@@ -87,7 +87,7 @@ sub run_snap($$$$$)
    my $output_name_tmp = $output_name . random_string();
    my $log_file = "$sample_name.mapping.log";
 
-   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name");
+   my $snap_command = "$snap_location paired snap_index $forward_reads $reverse_reads -o $output_name -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "'";
 
    # Use multiple cores if available
    if ($threads > 1)
@@ -95,7 +95,7 @@ sub run_snap($$$$$)
       $snap_command .= " -t $threads -b";
    }
 
-   $snap_command .=  "' -= &>> $log_file";
+   $snap_command .=  " -= &>> $log_file";
 
    system($snap_command);
 
@@ -244,7 +244,7 @@ sub indel_realign($$$)
 
    # Actually do realignment
    my $realigned_bam = random_string() . "realigned.$bam_file";
-   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam &> $log_file";
+   my $realign_command = "$java_location -Xmx3g -jar $gatk_location -T IndelRealigner -R $reference_file -I $bam_file -targetIntervals $bam_file.intervals -o $realigned_bam &>> $log_file";
    system($realign_command);
 
    # Overwrite with output files

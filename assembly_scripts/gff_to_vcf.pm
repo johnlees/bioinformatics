@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-package vcf_to_gff;
+package gff_to_vcf;
 
 use strict;
 use warnings;
@@ -100,6 +100,52 @@ sub transfer_annotation($$)
    # Finally, remove temporary files
    unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;
    assembly_common::add_tmp_file($stderr_file);
+}
+
+# Creates a file of exons for use with frameshift annotation
+sub create_exons_tab($$)
+{
+   my ($gff_file, $exons_file) = @_;
+
+   # Input and output
+   open (GFF, "$gff_file") || die("Could not open $gff_file\n");
+   open (EXONS, ">$exons_file") || die("Could not open $exons_file for writing\n");
+
+   # Headers in output are CHROM, FROM, TO
+   while (my $gff_line = <GFF>)
+   {
+      chomp $gff_line;
+
+      # Reached end of annotation?
+      if ($gff_line eq "##FASTA")
+      {
+         last;
+      }
+      elsif ($gff_line =~ /^##/)
+      {
+         next;
+      }
+      else
+      {
+         my ($contig, $predictor, $region, $start, $end, @gff_fields) = split("\t", $gff_line);
+
+         if ($region eq "CDS")
+         {
+            $contig =~ m/^.+|SC|(.+)$/;
+            my $chrom = $1;
+
+            print EXONS join("\t", $chrom, $start, $end) . "\n";
+         }
+
+      }
+   }
+
+   close GFF;
+   close EXONS;
+
+   # Output is bgzip compressed and tabix indexed
+   system("bgzip $exons_file");
+   system("tabix -s1 -b2 -e3 $exons_file.gz");
 }
 
 1;
