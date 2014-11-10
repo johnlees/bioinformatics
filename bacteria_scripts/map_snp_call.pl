@@ -39,7 +39,7 @@ my $mpileup_m = 2;
 my $mpileup_L = 0.0005;
 
 # VCF filters
-my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"1\" && PL[1]/PL[0] > 0.75)", "QUAL < 50", "MQ < 30", "SP > 30", "MQB < 0.001", "RPB < 0.001");
+my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"1\" && PL[1]/PL[0] > 0.75)", "QUAL < 50", "MQ < 30", "SP > 30", "MQSB < 0.001", "RPB < 0.001");
 my @vcf_filter_names = ("DEPTH", "RATIO", "VAR_QUAL", "MAP_QUAL", "STRAND_BIAS", "MQ_BIAS", "RP_BIAS");
 
 #
@@ -126,7 +126,7 @@ sub filter_vcf($$$)
    my ($vcf_file, $vcf_filters, $vcf_filter_names) = @_;
 
    my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
-   my @vcf_filter_names_new = map{ $_ .= "FAIL_"} @$vcf_filter_names;
+   my @vcf_filter_names_new = map{ $_ = "FAIL_" . $_ } @$vcf_filter_names;
 
    my $filter_command = "";
    foreach my $vcf_filter (@$vcf_filters)

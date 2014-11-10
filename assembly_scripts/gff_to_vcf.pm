@@ -131,7 +131,7 @@ sub create_exons_tab($$)
 
          if ($region eq "CDS")
          {
-            $contig =~ m/^.+|SC|(.+)$/;
+            $contig =~ m/^.+\|SC\|(.+)$/;
             my $chrom = $1;
 
             print EXONS join("\t", $chrom, $start, $end) . "\n";

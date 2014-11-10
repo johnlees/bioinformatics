@@ -208,6 +208,7 @@ sub mark_dups($)
    my $marked_bam = random_string() . "marked.$bam_file";
 
    my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file &> $log_file";
+   system($picard_command);
 
    rename $marked_bam, $bam_file;
 }
