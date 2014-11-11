@@ -319,17 +319,20 @@ else
 
       foreach my $bam (@bam_files)
       {
+         print STDERR "improve $bam\n";
+
          # Use Picard to remove duplicates (cannot rename output)
          my $improved_bam = mapping::mark_dups($bam);
 
-         my $bam_index =~ s/bam$/bai/;
-         assembly_common::add_tmp_file("$bam_index");
+         $improved_bam =~ m/^(.+)\.bam$/;
+         assembly_common::add_tmp_file("$1.bai");
          assembly_common::add_tmp_file("$bam.picard.log");
          assembly_common::add_tmp_file("$bam.dups");
 
+         # Use gatk to realign indels
          mapping::indel_realign($reference_file, $improved_bam, $threads);
-         assembly_common::add_tmp_file("$bam.intervals");
-         assembly_common::add_tmp_file("$bam.gatk.log");
+         assembly_common::add_tmp_file("$improved_bam.intervals");
+         assembly_common::add_tmp_file("$improved_bam.gatk.log");
 
          rename $improved_bam, $bam;
          rename "$improved_bam.bai", "$bam.bai";
