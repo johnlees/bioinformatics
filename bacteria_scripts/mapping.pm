@@ -108,18 +108,19 @@ sub run_snap($$$$$;$)
    # Use multiple cores if available
    if ($threads > 1)
    {
-      $snap_command .= " -t $threads -b";
+      $snap_command .= " -t $threads --b";
    }
 
    # Allow secondary alignments. Currently, these aren't used in calling
    # These parameters don't give too many extra read mappings
-   if (defined($secondary_alignments))
+   if ($secondary_alignments)
    {
       $snap_command .= " -om 1 -D 2 -omax 1";
    }
 
    $snap_command .=  " -= &>> $log_file";
 
+   print STDERR "$snap_command\n";
    system($snap_command);
 
    system("samtools fixmate -O bam $output_name $output_name_tmp");
@@ -228,12 +229,12 @@ sub mark_dups($)
    my $log_file = "$bam_file.picard.log";
 
    my $dup_file = "$bam_file.dups";
-   my $marked_bam = random_string() . "marked.$bam_file";
+   my $marked_bam = "marked_dups.$bam_file";
 
-   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file &> $log_file";
+   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file CREATE_INDEX=TRUE &> $log_file";
    system($picard_command);
 
-   rename $marked_bam, $bam_file;
+   return $marked_bam;
 }
 
 # Realigns bam files around indels
