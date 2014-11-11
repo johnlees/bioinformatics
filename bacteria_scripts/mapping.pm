@@ -52,20 +52,36 @@ sub random_string()
 }
 
 # Sorts a given bam file to coordinate order
-sub sort_bam($;$)
+sub sort_bam($;$$)
 {
-   my ($bam_file, $threads) = @_;
+   my ($bam_file, $threads, $program) = @_;
+
+   # Default to use samtools
+   if (!defined($program))
+   {
+      $program = "samtools";
+   }
 
    my $bam_sort_prefix = "tmp" . random_string();
    my $tmp_bam = random_string() . "$bam_file";
 
-   # Do multithreaded if specified
-   my $sort_command = "samtools sort -O bam -o $tmp_bam -T $bam_sort_prefix ";
-   if (defined($threads) && $threads > 1)
+   my $sort_command;
+
+   if ($program eq "picard")
    {
-      $sort_command .= "-@ $threads ";
+      $sort_command = "$java_location -Xmx2g -jar $picard_location SortSam VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$tmp_bam SORT_ORDER=coordinate";
    }
-   $sort_command .= "$bam_file";
+   else
+   {
+      $sort_command = "samtools sort -O bam -o $tmp_bam -T $bam_sort_prefix ";
+
+      # Do multithreaded if specified
+      if (defined($threads) && $threads > 1)
+      {
+         $sort_command .= "-@ $threads ";
+      }
+      $sort_command .= "$bam_file";
+   }
 
    system($sort_command);
 
@@ -73,9 +89,9 @@ sub sort_bam($;$)
 }
 
 # Run snap, producing sorted and indexed bam. Returns location of this bam
-sub run_snap($$$$$)
+sub run_snap($$$$$;$)
 {
-   my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads) = @_;
+   my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads, $secondary_alignments) = @_;
 
    # Create index for reference if required
    if (!-d "snap_index")
@@ -95,6 +111,13 @@ sub run_snap($$$$$)
       $snap_command .= " -t $threads -b";
    }
 
+   # Allow secondary alignments. Currently, these aren't used in calling
+   # These parameters don't give too many extra read mappings
+   if (defined($secondary_alignments))
+   {
+      $snap_command .= " -om 1 -D 2 -omax 1";
+   }
+
    $snap_command .=  " -= &>> $log_file";
 
    system($snap_command);
@@ -102,7 +125,7 @@ sub run_snap($$$$$)
    system("samtools fixmate -O bam $output_name $output_name_tmp");
    rename $output_name_tmp, $output_name;
 
-   sort_bam($output_name, $threads);
+   sort_bam($output_name, $threads, "picard");
 
    system("samtools index $output_name");
 
@@ -136,7 +159,7 @@ sub bwa_mem($$$$)
    my $output_name = "$sample_name.mapping.bam";
    my $log_file = "$sample_name.mapping.log";
 
-   my $bwa_command = "bwa mem -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
+   my $bwa_command = "bwa mem -M -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
    system($bwa_command);
 
    sort_bam($output_name);
