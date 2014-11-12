@@ -110,25 +110,23 @@ sub variant_windows($$$$)
             # Variant length. 1 for a SNP, > 1 for an insertion, < 1 for
             # a deletion
             my $var_length = length($alt) - length($ref) + 1;
-            my ($position_start, $position_end);
+            my $position_start = $position - 1;
+            my $position_end;
 
             # SNPs
             if ($var_length == 1)
             {
-               $position_start = $position - 1;
                $position_end = $position + $var_length;
             }
             # Deletions
             elsif ($var_length < 1)
             {
-               $position_start = $position;
                $position_end = $position - $var_length + 2;
             }
             # Insertions
             else
             {
-               $position_start = $position;
-               $position_end = $position + 1;
+               $position_end = $position + length($ref);
             }
 
             # Extract the window, then write it to the output
