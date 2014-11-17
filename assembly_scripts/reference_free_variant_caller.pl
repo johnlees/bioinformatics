@@ -558,7 +558,7 @@ else
    }
 
    # Annotate vcf, and extract passed variant sites only
-   vcf_to_gff::transfer_annotation($annotation_file, "$fixed_vcf.gz");
+   gff_to_vcf::transfer_annotation($annotation_file, "$fixed_vcf.gz");
 
    system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf.gz -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
    system($bcftools_location . " index $filtered_vcf 2>> $bcftools_stderr_file");
