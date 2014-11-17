@@ -10,35 +10,81 @@ use POSIX;
 #
 my $wait_time = 300;
 
-my $default_memory = 9500;
+my $default_memory = 12000;
 my $mem_increment = 1500;
-my $chunk_length = 5000000;
-
-my $qctool_memory = 300;
+my $bsub_queue = "long";
+my $chunk_length = 2500000;
 
 my $job_id_file = "job_ids.log";
 
 # file locations
 my $input_prefix = "shapeit2/cases-ALS-BPROOF.shapeit2.chr";
-my $ref_directory = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono";
 my $output_directory = "impute2";
-my $output_prefix = "cases-ALS-BPROOF";
+my $output_prefix = "meningitis";
 
 my $map_prefix = "genetic_map_chr";
 my $map_suffix = "_combined_b37.txt";
 
-my $ref_prefix = "ALL.chr";
-my $hap_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.haplotypes.gz";
-my $leg_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.legend.gz";
-my $ref_sample_file = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.sample";
+# Global ref panel (1000 genomes phase 3)
+my $ref0_directory = "1000GP_phase3";
+my $ref0_prefix = "ALL.chr";
+my $hap0_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.haplotypes.gz";
+my $leg0_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.legend.gz";
+my $ref0_sample_file = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.sample";
+
+# Local ref panel (GoNL)
+my $ref1_directory = "GoNL";
+my $ref1_prefix = "ALL.chr";
+my $hap1_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.haplotypes.gz";
+my $leg1_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.legend.gz";
+my $ref1_sample_file = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.sample";
 
 my $X_prefix = "ALL_1000G_phase1integrated_v3_chrX_nonPAR";
 my $X_hap_suffix = "_impute.hap.gz";
 my $X_leg_suffix = "_impute.legend.gz";
 
+# Chromosome lengths in GRCh37
+my %lengths = {
+		"1" => 249250621,
+		"2" => 243199373,
+		"3" => 198022430,
+		"4" => 191154276,
+		"5" => 180915260,
+		"6" => 171115067,
+		"7" => 159138663,
+		"8" => 146364022,
+		"9" => 141213431,
+		"10" => 135534747,
+		"11" => 134996516,
+		"12" => 133851895,
+		"13" => 115169878,
+		"14" => 107349540,
+		"15" => 102531392,
+		"16" => 90354753,
+		"17" => 81195210,
+		"18" => 78077248,
+		"19" => 59128983,
+		"20" => 63025520,
+		"21" => 48129895,
+		"22" => 51304566,
+		"X" => 155270560,
+		"Y" => 59373566
+	};
+
 #****************************************************************************************#
 #* Subs                                                                                 *#
 #****************************************************************************************#
+
+# Get number of jobs based on reference chrom length
+sub chrom_length($)
+{
+   my ($chromosome) = @_;
+
+   my $num_jobs = ceil($lengths{$chromosome} / $chunk_length);
+   return($num_jobs);
+}
+
+# Get number of jobs based on a single legend file
 sub chrom_jobs($)
 {
    my ($chrom_file) = @_;
@@ -148,31 +194,34 @@ sub run_impute2($$$)
 
    # Set up all the correct file names, which must be different for the
    # X chromosome
-   my ($m_file, $g_file, $g_sample_file, $h_file, $l_file, $impute2_command);
+   my ($m_file, $g_file, $g_sample_file, $h0_file, $l0_file, $h1_file, $l1_file, $impute2_command);
    unless ($chr eq "X")
    {
-      $h_file = "$ref_directory/$ref_prefix$chr$hap_suffix";
-      $l_file = "$ref_directory/$ref_prefix$chr$leg_suffix";
-      $m_file = "$ref_directory/$map_prefix$chr$map_suffix";
+      $h0_file = "$ref0_directory/$ref0_prefix$chr$hap0_suffix";
+      $l0_file = "$ref0_directory/$ref0_prefix$chr$leg0_suffix";
+      $h1_file = "$ref1_directory/$ref1_prefix$chr$hap1_suffix";
+      $l1_file = "$ref1_directory/$ref1_prefix$chr$leg1_suffix";
+
+      $m_file = "$ref0_directory/$map_prefix$chr$map_suffix";
       $g_file = "$input_prefix$chr.haps";
       $g_sample_file = "$input_prefix$chr.sample";
 
-      $impute2_command = "impute2 -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -merge_ref_panels -m $m_file -h $h0_file $h1_file -l $l0_file $l1_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
    else
    {
-      $h_file = "$ref_directory/$X_prefix$X_hap_suffix";
-      $l_file = "$ref_directory/$X_prefix$X_leg_suffix";
-      $m_file = "$ref_directory/$map_prefix" . "X_nonPAR" . "$map_suffix";
+      $h0_file = "$ref0_directory/$X_prefix$X_hap_suffix";
+      $l0_file = "$ref0_directory/$X_prefix$X_leg_suffix";
+      $m_file = "$ref0_directory/$map_prefix" . "X_nonPAR" . "$map_suffix";
       $g_file = "$input_prefix" . "X.haps";
       $g_sample_file = "$input_prefix" . "X.sample";
 
-      $impute2_command = "impute2 -chrX -m $m_file -h $h_file -l $l_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
+      $impute2_command = "impute2 -chrX -m $m_file -h $h0_file -l $l0_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
 
    # LSF part of the command specifies memory usage, stdout and stderr files
    # and queue
-   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q long";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q $bsub_queue";
 
    # Submit to LSF, and get the returned string which is then parsed for job id
    # example output: Job <5521290> is submitted to queue <normal>.
@@ -246,6 +295,17 @@ sub read_job_id_file()
 #* Main                                                                                 *#
 #****************************************************************************************#
 
+# Some *VERY* basic command line input
+my $do_X = $ARGV[0];
+if ($do_X eq "X")
+{
+   $do_X = 1;
+}
+else
+{
+   $do_X = 0;
+}
+
 # Append log output to file, as well as stdout
 open(LOG, ">>impute2-pipeline.log") || die ("Could not open impute2-pipeline.log for writing");
 open(ERRORS, ">>impute2-pipeline.err") || die ("Could not open impute2-pipeline.err for writing");
@@ -255,22 +315,28 @@ my %num_jobs;
 
 for (my $i = 1; $i <= 22; $i++)
 {
-   my $file_name = "$ref_directory/$ref_prefix$i$leg_suffix";
-   $num_jobs{$i} = chrom_jobs($file_name);
-   print LOG "Chr $i has $num_jobs{$i} chunks of 5Mb\n";
-   print "Chr $i has $num_jobs{$i} chunks of 5Mb\n";
+   $num_jobs{$i} = chrom_length($i);
+   print LOG "Chr $i has $num_jobs{$i} chunks of $chunk_length\n";
+   print "Chr $i has $num_jobs{$i} chunks of $chunk_length\n";
 }
-my $x_chr_name = "$ref_directory/$X_prefix$X_leg_suffix";
-$num_jobs{"X"} = chrom_jobs($x_chr_name);
-print LOG "Chr X has " . $num_jobs{"X"} . " chunks of 5Mb\n";
-print "Chr X has " . $num_jobs{"X"} . " chunks of 5Mb\n";
+
+if ($do_X)
+{
+   $num_jobs{"X"} = chrom_length("X");
+   print LOG "Chr X has " . $num_jobs{"X"} . " chunks of $chunk_length\n";
+   print "Chr X has " . $num_jobs{"X"} . " chunks of $chunk_length\n";
+}
 
 my %jobid;
 my %memory;
 
 # Set up jobs to run, then loop through them
 my @chrs = (1..22);
-push(@chrs, "X");
+
+if ($do_X)
+{
+   push(@chrs, "X");
+}
 
 # If job id file already exists, use these job ids. Useful if the pipeline is
 # restarted while the computation is ongoing
@@ -374,18 +440,8 @@ while ($imputation_ongoing)
    sleep($wait_time);
 }
 
-print LOG "All impute2 jobs finished - creating final output with qctool \n\n";
-print "All impute2 jobs finished - creating final output with qctool \n\n";
-
-# Convert output files to bgen
-
-foreach my $chr (sort keys %jobid)
-{
-   my $qctool_command = "qctool -g $output_directory/$output_prefix.$chr.#.gz -og $output_directory/$output_prefix.chr$chr.bgen -assume-chromosome $chr";
-   my $bsub_command = "bsub -J " . '"qctool"' . " -o $output_directory/qctool.%J.$chr.o -e $output_directory/qctool.%J.$chr.e -R " . '"' . "select[mem>$qctool_memory] rusage[mem=$qctool_memory]" . '"' . " -M$qctool_memory -q normal";
-
-   system("$bsub_command $qctool_command");
-}
+print LOG "All impute2 jobs finished\n\n";
+print "All impute2 jobs finished\n\n";
 
 close LOG;
 close ERRORS;
