@@ -40,7 +40,7 @@ my $leg1_suffix = ".snps_indels.r5.3.recode.legend.gz";
 my $ref1_sample_file = "gonl.chr19.snps_indels.r5.3.recode.sample_list";
 
 # Chromosome lengths in GRCh37
-my %chr_lengths = {
+my %chr_lengths = (
 "1" => 249250621,
 "2" => 243199373,
 "3" => 198022430,
@@ -65,7 +65,7 @@ my %chr_lengths = {
 "22" => 51304566,
 "X" => 155270560,
 "Y" => 59373566
-};
+);
 
 #****************************************************************************************#
 #* Subs                                                                                 *#
