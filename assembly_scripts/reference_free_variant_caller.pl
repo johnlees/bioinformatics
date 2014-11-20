@@ -103,6 +103,8 @@ my $filter_lines = <<'FILTERS';
 ##FILTER=<ID=PF_FAIL_REPEAT,Description="Identified as a repeat by population filter">
 FILTERS
 
+my $exons_file = "exons.tab";
+
 #
 # Help and usage
 #
@@ -554,15 +556,36 @@ else
       system($sga_command);
 
       system("bgzip $output_prefix.variant.vcf -c > $fixed_vcf.gz");
-      system("$bcftools_location index $fixed_vcf.gz");
+      $fixed_vcf .= ".gz";
+      system("$bcftools_location index $fixed_vcf");
    }
 
-   # Annotate vcf, and extract passed variant sites only
-   gff_to_vcf::transfer_annotation($annotation_file, "$fixed_vcf.gz");
+   # Annotate vcf
+   if (defined($annotation_file) && -e $annotation_file)
+   {
+      gff_to_vcf::transfer_annotation($annotation_file, "$fixed_vcf");
 
+      # annotate frameshifts
+      gff_to_vcf::create_exons_tab($annotation_file, $exons_file);
+      assembly_common::add_tmp_file("$exons_file.gz");
+      assembly_common::add_tmp_file("$exons_file.gz.tbi");
+
+      my $frameshift_vcf = assembly_common::random_string() . "$fixed_vcf";
+      system("bcftools plugin frameshifts -O z -o $frameshift_vcf $fixed_vcf -- -e $exons_file.gz");
+      rename $frameshift_vcf, $fixed_vcf;
+   }
+
+   # Extract variant sites only
    system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf.gz -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
    system($bcftools_location . " index $filtered_vcf 2>> $bcftools_stderr_file");
    assembly_common::add_tmp_file($bcftools_stderr_file);
+
+   # normalise indels w/ bcftools norm
+   my $realigned_name = $filtered_vcf . assembly_common::random_string();
+   system("bcftools norm -f $assembly_file -O z -o $realigned_name $filtered_vcf");
+
+   rename $realigned_name, $filtered_vcf;
+   system("bcftools index -f $filtered_vcf");
 
    print "Final output:\n$filtered_vcf\n";
 
