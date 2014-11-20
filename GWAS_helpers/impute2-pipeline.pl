@@ -198,8 +198,8 @@ sub run_impute2($$$)
    $l1_file = "$ref1_directory/$ref1_prefix$chr$leg1_suffix";
 
    $m_file = "$ref0_directory/$map_prefix$chr$map_suffix";
-   $g_file = "$input_prefix$chr.haps";
-   $g_sample_file = "$input_prefix$chr.sample";
+   $g_file = "$input_prefix$chr.haps.gz";
+   $g_sample_file = "$input_prefix$chr.sample.gz";
 
    unless ($chr eq "X")
    {
