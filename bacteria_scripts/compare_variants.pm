@@ -10,6 +10,160 @@ use Bio::SeqIO;
 my $blastn_location = "blastn";
 my $bcftools_location= "bcftools";
 
+my %flip = (
+   "A" => "T",
+   "T" => "A",
+   "G" => "C",
+   "C" => "G");
+
+sub classify_var($$$$)
+{
+   my (@variants) = @_;
+
+   # Any site > 1 base must be an indel
+   my ($type, $match);
+
+   # Check for indels
+   my @del_bases;
+   for (my $i = 0; $i<=3; $i+=2)
+   {
+      if (length($variants[$i]) > 1 || length($variants[$i+1]) > 1)
+      {
+         $type = "INDEL";
+         $del_bases[$i/2] = decompose_indel($variants[$i], $variants[$i+1]);
+      }
+      else
+      {
+         $del_bases[$i/2] = "";
+      }
+
+   }
+
+   # Classify snps
+   if (!defined($type))
+   {
+      $type = "SNP";
+
+      my ($q_ref, $q_alt, $s_ref, $s_alt) = @variants;
+      if ($q_ref eq $s_ref && $q_alt eq $s_alt)
+      {
+         $match = "EXACT";
+      }
+      elsif ($q_ref eq $s_alt && $q_alt eq $s_ref)
+      {
+         $match = "SWITCHED";
+      }
+      # This distinction can't really be made for A/T and G/C SNPs
+      elsif (flip_strand($q_ref) eq $s_ref && flip_strand($q_alt) eq $s_alt)
+      {
+         $match = "EXACT_FLIP";
+      }
+      elsif (flip_strand($q_ref) eq $s_alt && flip_strand($q_alt) eq $s_ref)
+      {
+         $match = "SWITCH_FLIP";
+      }
+      else
+      {
+         $match = "MISMATCH";
+      }
+   }
+   # Classify indels
+   else
+   {
+      if ($del_bases[0] eq $del_bases[1])
+      {
+         $match = "EXACT";
+      }
+      elsif (flip_strand($del_bases[0]) eq $del_bases[1])
+      {
+         $match = "EXACT_FLIP";
+      }
+      elsif (flip_strand($del_bases[0], "reverse") eq $del_bases[1])
+      {
+         $match = "SWITCH_FLIP";
+      }
+      else
+      {
+         $match = "MISMATCH";
+      }
+   }
+
+   # Work out match status. Assembly strands/contigs may be flipped!
+   return($type, $match);
+}
+
+# Reverse complement a sequence
+sub flip_strand($;$)
+{
+   my ($sequence, $direction) = @_;
+
+   # Set whether to also reverse sequence
+   if (!defined($direction))
+   {
+      $direction = "forward";
+   }
+
+   # Decompose string into bases
+   my @bases = split("", $sequence);
+   my @flipped;
+
+   # Flip each base, and append to either start or end of array
+   foreach my $base (@bases)
+   {
+      if ($direction eq "reverse")
+      {
+         unshift(@flipped, $flip{$base});
+      }
+      else
+      {
+         push(@flipped, $flip{$base});
+      }
+   }
+
+   # Join bases back into a string and return
+   my $flipped_sequence = join("", @flipped);
+   return($flipped_sequence);
+}
+
+# Needs left aligned INDELS. Use bcftools norm
+sub decompose_indel($$)
+{
+   my ($ref, $alt) = @_;
+
+   # Treat everything as deletions i.e. move longer alts to be the ref
+   if (length($alt) > length($ref))
+   {
+      my $tmp_ref = $ref;
+      $ref = $alt;
+      $alt = $tmp_ref;
+   }
+
+   my $del_bases;
+   # INDEL could go at either end, as either end of ref sequence matches alt
+   if (substr($ref, 0, length($alt)) eq substr($ref, length($ref) - length($alt), length($alt)))
+   {
+      # Homopolymer indels will hit this. They need to be treated
+      # as below
+      if (length($ref) == 2*length($alt))
+      {
+         $del_bases = substr($ref, length($alt));
+      }
+      else
+      {
+         $del_bases = substr($ref, length($alt), length($ref) - 2*length($alt));
+      }
+   }
+   # For left aligned indels, can just take bases of ref past alt
+   else
+   {
+      $del_bases = substr($ref, length($alt));
+   }
+
+   #DEBUG
+   #print STDERR "$ref,$alt,$del_bases\n";
+   return($del_bases);
+}
+
 # list diff, union, intersection
 sub list_compare($$$)
 {

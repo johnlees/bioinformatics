@@ -28,10 +28,11 @@ sequences
 
 
    Optional
-   --strict            Requires ref and alt positions to match as well as
-                       sequence surrounding them. May fail for INDELs
    --threshold         Minimum blast score to claim a match. Default 280
    --top-hit           Report only the top blast hit for each variant in vcf1
+
+   --dirty             Leave fasta files of nucleotide windows for further
+                       analysis
 
    -h, --help          Shows more detailed help.
 
@@ -43,13 +44,13 @@ HELP
 #****************************************************************************************#
 
 #* gets input parameters
-my ($vcf1, $ref1, $vcf2, $ref2, $strict, $threshold, $top_hit, $help);
+my ($vcf1, $ref1, $vcf2, $ref2, $strict, $threshold, $top_hit, $dirty, $help);
 GetOptions( "vcf1=s" => \$vcf1,
             "vcf2=s" => \$vcf2,
             "ref1=s" => \$ref1,
             "ref2=s" => \$ref2,
-            "strict" => \$strict,
             "top-hit" => \$top_hit,
+            "dirty" => \$dirty,
             "threshold=i" => \$threshold,
             "help|h" => \$help
 		   ) or die($help_message);
@@ -87,23 +88,15 @@ else
       foreach my $s_id (sort keys %{$$blast_scores{$q_id}})
       {
          $match++;
-         if ($strict)
-         {
-            my ($q_chrom, $q_pos, $q_ref, $q_alt) = split(',', $q_id);
-            my ($s_chrom, $s_pos, $s_ref, $s_alt) = split(',', $s_id);
+         my ($q_chrom, $q_pos, $q_ref, $q_alt) = split(',', $q_id);
+         my ($s_chrom, $s_pos, $s_ref, $s_alt) = split(',', $s_id);
 
-            # Skip over if ref and alt do not match (only really works for
-            # SNPs)
-            if (!(($q_ref eq $s_ref && $q_alt eq $s_alt) || ($q_ref eq $s_alt && $q_alt eq $s_ref)))
-            {
-               next;
-            }
-         }
+         my ($type, $align) = compare_variants::classify_var($q_ref, $q_alt, $s_ref, $s_alt);
 
          # Only print scores above provided threshold
          if ($$blast_scores{$q_id}{$s_id} >= $threshold)
          {
-            my $output_string = "$q_id\t$s_id\t$$blast_scores{$q_id}{$s_id}\n";
+            my $output_string = "$q_id\t$s_id\t$$blast_scores{$q_id}{$s_id}\t$type\t$align\n";
 
             # Only print top hit if required (store in array until the last
             # match reached)
@@ -140,7 +133,10 @@ else
       }
    }
 
-   unlink "blast_windows.1.fa", "blast_windows.2.fa";
+   unless(defined($dirty))
+   {
+      unlink "blast_windows.1.fa", "blast_windows.2.fa";
+   }
 }
 
 exit(0);
