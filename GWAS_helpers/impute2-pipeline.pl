@@ -10,7 +10,7 @@ use POSIX;
 #
 my $wait_time = 300;
 
-my $default_memory = 12000;
+my $default_memory = 13000;
 my $mem_increment = 1500;
 my $bsub_queue = "long";
 my $chunk_length = 2500000;
@@ -18,58 +18,54 @@ my $chunk_length = 2500000;
 my $job_id_file = "job_ids.log";
 
 # file locations
-my $input_prefix = "shapeit2/cases-ALS-BPROOF.shapeit2.chr";
-my $output_directory = "impute2";
+my $input_prefix = "shapeit2/meningitis_phased.";
+my $output_directory = "/lustre/scratch108/bacteria/jl11/human_data/impute2";
 my $output_prefix = "meningitis";
 
 my $map_prefix = "genetic_map_chr";
 my $map_suffix = "_combined_b37.txt";
 
 # Global ref panel (1000 genomes phase 3)
-my $ref0_directory = "1000GP_phase3";
-my $ref0_prefix = "ALL.chr";
-my $hap0_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.haplotypes.gz";
-my $leg0_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.legend.gz";
-my $ref0_sample_file = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.sample";
+my $ref0_directory = "1000GP_Phase3";
+my $ref0_prefix = "1000GP_Phase3_chr";
+my $hap0_suffix = ".hap.gz";
+my $leg0_suffix = ".legend.gz";
+my $ref0_sample_file = "1000GP_Phase3.sample";
 
 # Local ref panel (GoNL)
 my $ref1_directory = "GoNL";
-my $ref1_prefix = "ALL.chr";
-my $hap1_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.haplotypes.gz";
-my $leg1_suffix = ".integrated_phase1_v3.20101123.snps_indels_svs.genotypes.nomono.legend.gz";
-my $ref1_sample_file = "ALL.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.sample";
-
-my $X_prefix = "ALL_1000G_phase1integrated_v3_chrX_nonPAR";
-my $X_hap_suffix = "_impute.hap.gz";
-my $X_leg_suffix = "_impute.legend.gz";
+my $ref1_prefix = "gonl.chr";
+my $hap1_suffix = ".snps_indels.r5.3.recode.hap.gz";
+my $leg1_suffix = ".snps_indels.r5.3.recode.legend.gz";
+my $ref1_sample_file = "gonl.chr19.snps_indels.r5.3.recode.sample_list";
 
 # Chromosome lengths in GRCh37
-my %lengths = {
-		"1" => 249250621,
-		"2" => 243199373,
-		"3" => 198022430,
-		"4" => 191154276,
-		"5" => 180915260,
-		"6" => 171115067,
-		"7" => 159138663,
-		"8" => 146364022,
-		"9" => 141213431,
-		"10" => 135534747,
-		"11" => 134996516,
-		"12" => 133851895,
-		"13" => 115169878,
-		"14" => 107349540,
-		"15" => 102531392,
-		"16" => 90354753,
-		"17" => 81195210,
-		"18" => 78077248,
-		"19" => 59128983,
-		"20" => 63025520,
-		"21" => 48129895,
-		"22" => 51304566,
-		"X" => 155270560,
-		"Y" => 59373566
-	};
+my %chr_lengths = {
+"1" => 249250621,
+"2" => 243199373,
+"3" => 198022430,
+"4" => 191154276,
+"5" => 180915260,
+"6" => 171115067,
+"7" => 159138663,
+"8" => 146364022,
+"9" => 141213431,
+"10" => 135534747,
+"11" => 134996516,
+"12" => 133851895,
+"13" => 115169878,
+"14" => 107349540,
+"15" => 102531392,
+"16" => 90354753,
+"17" => 81195210,
+"18" => 78077248,
+"19" => 59128983,
+"20" => 63025520,
+"21" => 48129895,
+"22" => 51304566,
+"X" => 155270560,
+"Y" => 59373566
+};
 
 #****************************************************************************************#
 #* Subs                                                                                 *#
@@ -80,7 +76,7 @@ sub chrom_length($)
 {
    my ($chromosome) = @_;
 
-   my $num_jobs = ceil($lengths{$chromosome} / $chunk_length);
+   my $num_jobs = ceil($chr_lengths{$chromosome} / $chunk_length);
    return($num_jobs);
 }
 
@@ -195,33 +191,28 @@ sub run_impute2($$$)
    # Set up all the correct file names, which must be different for the
    # X chromosome
    my ($m_file, $g_file, $g_sample_file, $h0_file, $l0_file, $h1_file, $l1_file, $impute2_command);
+
+   $h0_file = "$ref0_directory/$ref0_prefix$chr$hap0_suffix";
+   $l0_file = "$ref0_directory/$ref0_prefix$chr$leg0_suffix";
+   $h1_file = "$ref1_directory/$ref1_prefix$chr$hap1_suffix";
+   $l1_file = "$ref1_directory/$ref1_prefix$chr$leg1_suffix";
+
+   $m_file = "$ref0_directory/$map_prefix$chr$map_suffix";
+   $g_file = "$input_prefix$chr.haps";
+   $g_sample_file = "$input_prefix$chr.sample";
+
    unless ($chr eq "X")
    {
-      $h0_file = "$ref0_directory/$ref0_prefix$chr$hap0_suffix";
-      $l0_file = "$ref0_directory/$ref0_prefix$chr$leg0_suffix";
-      $h1_file = "$ref1_directory/$ref1_prefix$chr$hap1_suffix";
-      $l1_file = "$ref1_directory/$ref1_prefix$chr$leg1_suffix";
-
-      $m_file = "$ref0_directory/$map_prefix$chr$map_suffix";
-      $g_file = "$input_prefix$chr.haps";
-      $g_sample_file = "$input_prefix$chr.sample";
-
       $impute2_command = "impute2 -merge_ref_panels -m $m_file -h $h0_file $h1_file -l $l0_file $l1_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
    else
    {
-      $h0_file = "$ref0_directory/$X_prefix$X_hap_suffix";
-      $l0_file = "$ref0_directory/$X_prefix$X_leg_suffix";
-      $m_file = "$ref0_directory/$map_prefix" . "X_nonPAR" . "$map_suffix";
-      $g_file = "$input_prefix" . "X.haps";
-      $g_sample_file = "$input_prefix" . "X.sample";
-
       $impute2_command = "impute2 -chrX -m $m_file -h $h0_file -l $l0_file -known_haps_g $g_file -sample_g $g_sample_file -int $int_start $int_end -Ne 20000 -o_gz -o $output_directory/$output_prefix.impute2.$chr.$chunk";
    }
 
    # LSF part of the command specifies memory usage, stdout and stderr files
    # and queue
-   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/impute2.%J.$chr.$chunk.o -e $output_directory/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q $bsub_queue";
+   my $bsub_command = "bsub -J " . '"impute2"' . " -o $output_directory/logs/impute2.%J.$chr.$chunk.o -e $output_directory/logs/impute2.%J.$chr.$chunk.e -R " . '"' . "select[mem>$memory] rusage[mem=$memory]" . '"' . " -M$memory -q $bsub_queue";
 
    # Submit to LSF, and get the returned string which is then parsed for job id
    # example output: Job <5521290> is submitted to queue <normal>.
@@ -297,7 +288,7 @@ sub read_job_id_file()
 
 # Some *VERY* basic command line input
 my $do_X = $ARGV[0];
-if ($do_X eq "X")
+if (defined($do_X) && $do_X eq "X")
 {
    $do_X = 1;
 }
