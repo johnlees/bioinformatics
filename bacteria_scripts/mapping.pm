@@ -147,9 +147,9 @@ sub snap_index($)
 }
 
 # Run bwa mem, producing sorted and indexed bam. Returns location of this bam
-sub bwa_mem($$$$)
+sub bwa_mem($$$$;$)
 {
-   my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
+   my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads) = @_;
 
    # Create index for reference if required
    if (!-e "$reference_name.bwt")
@@ -157,10 +157,15 @@ sub bwa_mem($$$$)
       bwa_index($reference_name);
    }
 
+   if(!defined($threads))
+   {
+      $threads = 1;
+   }
+
    my $output_name = "$sample_name.mapping.bam";
    my $log_file = "$sample_name.mapping.log";
 
-   my $bwa_command = "bwa mem -M -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
+   my $bwa_command = "bwa mem -M -t $threads -R '" . join('\t', '@RG', "ID:$sample_name", "PL:ILLUMINA", "SM:$sample_name") . "' $reference_name $forward_reads $reverse_reads 2>> $log_file | samtools fixmate -O bam - $output_name";
    system($bwa_command);
 
    sort_bam($output_name);

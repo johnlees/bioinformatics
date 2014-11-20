@@ -280,7 +280,14 @@ else
          }
          elsif ($bwa)
          {
-            push(@map_threads, threads->create(\&mapping::bwa_mem, $reference_file, $sample, $forward_reads, $reverse_reads));
+            if (!$linear)
+            {
+               push(@map_threads, threads->create(\&mapping::run_bwa, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
+            }
+            else
+            {
+               push(@map_threads, threads->create(\&mapping::run_bwa, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
+            }
          }
          elsif ($snap)
          {
