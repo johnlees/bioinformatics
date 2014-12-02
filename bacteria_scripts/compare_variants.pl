@@ -12,6 +12,8 @@ use Getopt::Long;
 
 use compare_variants;
 
+my $filter = "PASS";
+
 my $help_message = <<HELP;
 Usage: ./compare_variants.pl --vcf1 <1.vcf.gz> --vcf2 <2.vcf.gz> --ref1 <ref1.fa> --ref2 <ref2.fa>
 
@@ -30,6 +32,8 @@ sequences
    Optional
    --threshold         Minimum blast score to claim a match. Default 280
    --top-hit           Report only the top blast hit for each variant in vcf1
+   --type              Comma separated list of snps, indels, mnps or other
+                       (default all)
 
    --dirty             Leave fasta files of nucleotide windows for further
                        analysis
@@ -44,12 +48,13 @@ HELP
 #****************************************************************************************#
 
 #* gets input parameters
-my ($vcf1, $ref1, $vcf2, $ref2, $strict, $threshold, $top_hit, $dirty, $help);
+my ($vcf1, $ref1, $vcf2, $ref2, $strict, $threshold, $top_hit, $type, $dirty, $help);
 GetOptions( "vcf1=s" => \$vcf1,
             "vcf2=s" => \$vcf2,
             "ref1=s" => \$ref1,
             "ref2=s" => \$ref2,
             "top-hit" => \$top_hit,
+            "type=s" => $type,
             "dirty" => \$dirty,
             "threshold=i" => \$threshold,
             "help|h" => \$help
@@ -74,8 +79,13 @@ else
       $threshold = 280;
    }
 
+   if (!defined($type))
+   {
+      $type = "snps,indels,mnps,other";
+   }
+
    # Run blastn comparison of windows
-   compare_variants::create_blastn_input(\@vcfs, \@refs, "blast_windows");
+   compare_variants::create_blastn_input(\@vcfs, \@refs, "blast_windows", $filter, $type);
    my $blast_scores = compare_variants::blastn_pairwise("blast_windows.1.fa", "blast_windows.2.fa");
 
    # Print blast results

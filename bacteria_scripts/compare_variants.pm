@@ -349,14 +349,14 @@ sub extract_bp_window($$$;$)
 
 # Takes a list of paired vcfs and reference fastas and creates a multifasta of
 # windows around the variants
-sub create_blastn_input($$$)
+sub create_blastn_input($$$;$$)
 {
-   my ($vcfs, $refs, $out_prefix) = @_;
+   my ($vcfs, $refs, $out_prefix, $filter, $type) = @_;
 
    my $i = 1;
    foreach my $vcf (@$vcfs)
    {
-      my $variant_lists = extract_vcf_variants($vcf);
+      my $variant_lists = extract_vcf_variants($vcf, $filter, $type);
       variant_windows(300, $variant_lists, shift(@$refs), "$out_prefix.$i.fa");
 
       $i++;
@@ -365,12 +365,12 @@ sub create_blastn_input($$$)
 }
 
 # Get a list of variant sites from a vcf
-sub extract_vcf_variants($)
+sub extract_vcf_variants($;$$)
 {
-   my ($vcf_in) = @_;
+   my ($vcf_in, $filter, $type) = @_;
 
    # Tab delimited contig, position list of all variants in vcf
-   my $bcftools_command = "$bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' $vcf_in";
+   my $bcftools_command = "$bcftools_location view -f $filter -v $type $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' -";
    my $bcf_return = `$bcftools_command`;
 
    # Create a hash of variant details
