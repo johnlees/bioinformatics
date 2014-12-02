@@ -54,7 +54,7 @@ GetOptions( "vcf1=s" => \$vcf1,
             "ref1=s" => \$ref1,
             "ref2=s" => \$ref2,
             "top-hit" => \$top_hit,
-            "type=s" => $type,
+            "type=s" => \$type,
             "dirty" => \$dirty,
             "threshold=i" => \$threshold,
             "help|h" => \$help
