@@ -8,11 +8,13 @@
 use strict;
 use warnings;
 
+my $total = $ARGV[0];
+
 my @types = ("snps", "indels");
 
 print join("\t", "Run", "Type", "Power", "False positives\n");
 
-for (my $i = 2; $i <= 2; $i++)
+for (my $i = 1; $i <= $total; $i++)
 #for (my $i = 1; $i <= 100; $i++)
 {
    chdir "R6_mutant$i";
