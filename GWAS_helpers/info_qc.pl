@@ -12,7 +12,7 @@ open (FILES, "$file_list") || die("Could not open $file_list\n");
 while (my $line = <FILES>)
 {
    chomp $line;
-   my ($path, $chr, $chunk, $suffix) = split("\t", $line);
+   my ($path, $chr, $chunk, $suffix) = split(/\./, $line);
 
    my ($info_field, $out_fields);
    if (($chr eq "X" || $chr eq "Y") && $chunk !~ /PAR/)
