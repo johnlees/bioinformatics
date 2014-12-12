@@ -3,10 +3,12 @@ library(rjags)
 # Based on code for exercise 9.2 in 'Doing Bayesian Data Analysis',
 # 1st edition, Kruschke 2011
 
+data_file <- "~/Documents/PhD/hsd_locus/mapping/jags_5prime_input.txt"
+
 #
 # Hierarchical model spec
 #
-jagsModelSpec = "
+jags_model_spec = "
 # JAGS model specification
 model {
   # For each sample, likelihood and prior
@@ -17,7 +19,7 @@ model {
     y[sample_index] ~ dbin(theta[sample_index], N[sample_index]) 
     
     # Beta prior for proportion of population with allele in each sample
-    theta[sample_index] ~ dbeta(a[tissue[sample_index]], b[tissue[sample_index]])I(0.001,0.999)
+    theta[sample_index] ~ dbeta(a[tissue[sample_index]], b[tissue[sample_index]])
   }
 
   # For each tissue (blood or csf) hyperpriors
@@ -50,14 +52,14 @@ model {
   sdGamma <- 10
 }
 "
-writeLines(modelString,con="model.txt")
+writeLines(jags_model_spec,con="model.txt")
 #
 # Read in data
 #
-5primeReads <- read.table("5prime_jags.txt", header=T)
+five_prime_reads <- read.delim(data_file)
 
 # Convert to a list for use with JAGS
-5primeData = list(num_tissues = length(unique(5primeReads$Tissue)), num_samples = length(5primeReads$TotalReads), tissue = 5primeReads$Tissue, N = 5primeReads$TotalReads, y = 5primeReads$AReads)
+five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)), num_samples = length(five_prime_reads$TotalReads), tissue = five_prime_reads$Tissue, N = five_prime_reads$TotalReads, y = five_prime_reads$AReads)
 
 #
 # JAGS chain parameters
@@ -79,7 +81,7 @@ num_iterations = ceiling((num_save_steps * thin_steps ) / num_chains)
 #
 
 # Create and adapt
-jags_model = jags.model("model.txt" , data=5primeData, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model = jags.model("model.txt" , data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
@@ -87,7 +89,7 @@ update(jags_model , n.iter=burn_in_steps)
 
 # Converged chain
 cat( "Sampling iterations...\n" )
-coda_samples = coda.samples(jags_model, variable.names=parameters, n.iter=nIter, thin=thin_steps)
+coda_samples = coda.samples(jags_model, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
 
 # resulting codaSamples object has these indices:
 #   codaSamples[[ chainIdx ]][ stepIdx , paramIdx ]
@@ -98,12 +100,5 @@ coda_samples = coda.samples(jags_model, variable.names=parameters, n.iter=nIter,
 mcmc_chains = as.matrix( coda_samples )
 
 # Save the results
-mu = NULL
-for (i in 1:num_tissues)
-{
-  mu = rbind(mu, mcmc_chains(paste(",mu[",i,"]",sep="")))
-}
-
-kappa = mcmc_chains[,"kappa"]
-save(mu, kappa, file="jags_result.Rdata")
+save(mcmc_chains, file="jags_result.Rdata")
 
