@@ -19,7 +19,7 @@ model {
     y[sample_index] ~ dbin(theta[sample_index], N[sample_index]) 
     
     # Beta prior for proportion of population with allele in each sample
-    theta[sample_index] ~ dbeta(a[tissue[sample_index]], b[tissue[sample_index]])
+    theta[sample_index] ~ dbeta(a[tissue[sample_index]], b[tissue[sample_index]])T(0.0001,0.9999)
   }
 
   # For each tissue (blood or csf) hyperpriors
@@ -81,7 +81,7 @@ num_iterations = ceiling((num_save_steps * thin_steps ) / num_chains)
 #
 
 # Create and adapt
-jags_model = jags.model("model.txt" , data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model = jags.model("model.txt", data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
