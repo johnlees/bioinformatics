@@ -1,15 +1,26 @@
 #
+# A Bayesian hierarchical model for hsdS allele in S. Pneumo, based on the D39 reference
+# Estimates the allele distribution both within a single sample, and in the tissue type
+# it was taken from (e.g. blood, csf, nasopharynx)
+#
+# Author: John Lees
+# 2014-2015
+#
+# Model based on elements of code for exercise 9.2 in 
+# 'Doing Bayesian Data Analysis', 1st edition, Kruschke 2011
+#
+
+#
 # Libraries
 #
 library(coda)
 library(rjags)
 
-# Model based on elements of code for exercise 9.2 in 
-# 'Doing Bayesian Data Analysis', 1st edition, Kruschke 2011
-
 #
 # Constants
 #
+
+# Data input
 data_location <- "~/Documents/PhD/hsd_locus/mapping/"
 
 five_prime_input <- paste(data_location, "jags_5prime_input.txt", sep="")
@@ -18,10 +29,9 @@ three_prime_input <- paste(data_location, "ivr_mapped_alleles.txt", sep="")
 # Possible outcomes
 alleles = c("A", "B", "C", "D", "E", "F")
 
-#
-# JAGS chain parameters
-#
-parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterior distributions
+# Seed for rng - set to make reproducible
+rng_seed = 1
+
 
 # MCMC params
 adapt_steps = 500 
@@ -108,13 +118,16 @@ five_prime_reads <- read.delim(five_prime_input)
 # Convert to a list for use with JAGS
 five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)), num_samples = length(five_prime_reads$TotalReads), tissue = five_prime_reads$Tissue, N = five_prime_reads$TotalReads, y = five_prime_reads$AReads)
 
+# JAGS chain parameters
+parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterior distributions
+
 #
 # Run the model
 #
 
 # Create and adapt
 cat("Running first model\n\n")
-jags_model1 = jags.model("model1.txt", data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model1 = jags.model("model1.txt", data=five_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed), n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
@@ -252,7 +265,7 @@ parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior di
 
 # Create and adapt
 cat("Running second model\n\n")
-jags_model2 = jags.model("model2.txt", data=three_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model2 = jags.model("model2.txt", data=three_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed), n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
