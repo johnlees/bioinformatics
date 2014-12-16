@@ -133,7 +133,12 @@ save(coda_samples1, file="chain1.Rdata")
 cat("Converting data\n\n")
 mcmc_chain = as.matrix(coda_samples)
 
-# Need to remove missing from this
+# Output from ivr-typer
+# Columns: sample, 1.1 reads, 1.2 reads, 2.1 reads, 2.2 reads, 2.3 reads, 2.1 reads, 2.2 reads, 2.3 reads
+# Where the last 6 fields are 3 mapping to 1.1, and 3 mapping to 1.2 respectively
+#
+# Need to remove samples with no reads mapping in the first allele before processing
+# awk '$2+$3!=0 {print $0}' ivr_mapped_alleles.txt > jags_3prime_input.txt
 hsd_mapping <- read.delim(three_prime_input, header=F)
 
 # Copy five prime data structure
@@ -142,7 +147,9 @@ N <- NULL
 
 # For each sample in the first chain
 for (i in 1:nrow(three_prime_reads)) {
-  theta = mcmc_chain[,"theta[5]"]
+  # Extract the column of the matrix
+  col_name <- paste("theta[",i,"]",sep="")
+  theta = mcmc_chain[,col_name]
   
   # Sums of reads mapping to 1.1 and 1.2 respectively
   # This gives a distribution for sample size.
