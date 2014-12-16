@@ -99,7 +99,7 @@ model {
   sdGamma <- 10
 }
 "
-writeLines(jags_model1_spec,con="model.txt")
+writeLines(jags_model1_spec,con="model1.txt")
 #
 # Read in data
 #
@@ -114,23 +114,27 @@ five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)), nu
 
 # Create and adapt
 cat("Running first model\n\n")
-jags_model = jags.model("model.txt", data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model1 = jags.model("model1.txt", data=five_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
-update(jags_model , n.iter=burn_in_steps)
+update(jags_model1, n.iter=burn_in_steps)
 
 # Converged chain
 cat( "Sampling iterations...\n" )
-coda_samples1 = coda.samples(jags_model, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+coda_samples1 = coda.samples(jags_model1, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+
+# Save the chain
+save(coda_samples1, file="chain1.Rdata")
 
 #
 # Use first model posteriors to produce data for second model
 #
 cat("Converting data\n\n")
+mcmc_chain = as.matrix(coda_samples)
 
 # Need to remove missing from this
-hsd_mapping <- read.delim(three_prime_data, header=F)
+hsd_mapping <- read.delim(three_prime_input, header=F)
 
 # Copy five prime data structure
 three_prime_reads <- five_prime_reads[c("TotalReads", "Tissue")]
@@ -138,7 +142,7 @@ N <- NULL
 
 # For each sample in the first chain
 for (i in 1:nrow(three_prime_reads)) {
-  theta = as.matrix(coda_samples1[,i+7,drop=FALSE])
+  theta = mcmc_chain[,"theta[5]"]
   
   # Sums of reads mapping to 1.1 and 1.2 respectively
   # This gives a distribution for sample size.
@@ -151,28 +155,33 @@ for (i in 1:nrow(three_prime_reads)) {
   allele1 <- sum(sample(theta, N[i], replace=TRUE) > 0.5)
   
   # Set up weighted sample for counts of alleles.
-  weights1 = vet_weights(reads[c("V4","V5","V6")]))
-  weights2 = vet_weights(reads[c("V7","V8","V9")]))
+  weights1 = vet_weights(reads[c("V4","V5","V6")])
+  weights2 = vet_weights(reads[c("V7","V8","V9")])
   # Output is a table of counts for the six possible alleles
-  sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=reads[c("V4","V5","V6")]), sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=reads[c("V7","V8","V9")])))
+  sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1), sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
   
   # Convert this table into a data frame (badly)
   for (j in 1:length(alleles))
   {
-    if (is.na(sampled_alleles[j]))
+    if (is.na(sampled_alleles[alleles[j]]))
     {
       three_prime_reads[i,alleles[j]] = 0
     }
     else
     {
-      three_prime_reads[i,alleles[j]] = sampled_alleles[j]
+      three_prime_reads[i,alleles[j]] = sampled_alleles[alleles[j]]
     }
   }
   # Free memory where possible
   rm(theta)
 }
 
+rm(mcmc_chain)
+
 three_prime_reads$TotalReads <- N
+
+# Save the converted data
+save(three_prime_reads, file="three_prime_reads.Rdata")
 
 #
 # Run second model
@@ -220,7 +229,7 @@ model {
   sdGamma <- 10
 }
 "
-writeLines(jags_model2_spec,con="model.txt")
+writeLines(jags_model2_spec,con="model2.txt")
 
 # Convert to a list for use with JAGS
 three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)), num_samples = length(three_prime_reads$TotalReads), tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads, y = three_prime_reads[,alleles])
@@ -236,12 +245,15 @@ parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior di
 
 # Create and adapt
 cat("Running second model\n\n")
-jags_model = jags.model("model.txt", data=three_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
+jags_model2 = jags.model("model2.txt", data=three_prime_data, n.chains=num_chains, n.adapt=adapt_steps)
 
 # Burn-in
 cat("MCMC burn in iterations...\n")
-update(jags_model , n.iter=burn_in_steps)
+update(jags_model2, n.iter=burn_in_steps)
 
 # Converged chain
 cat( "Sampling iterations...\n" )
-coda_samples2 = coda.samples(jags_model, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+coda_samples2 = coda.samples(jags_model2, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+
+# Save the chain
+save(coda_samples2, file="chain2.Rdata")
