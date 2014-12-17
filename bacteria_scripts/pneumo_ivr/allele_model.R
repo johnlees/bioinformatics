@@ -144,7 +144,7 @@ save(coda_samples1, file="chain1.Rdata")
 # Use first model posteriors to produce data for second model
 #
 cat("Converting data\n\n")
-mcmc_chain = as.matrix(coda_samples)
+mcmc_chain = as.matrix(coda_samples1)
 
 # Output from ivr-typer
 # Columns: sample, 1.1 reads, 1.2 reads, 2.1 reads, 2.2 reads, 2.3 reads, 2.1 reads, 2.2 reads, 2.3 reads
@@ -180,7 +180,7 @@ for (i in 1:nrow(three_prime_reads)) {
   # Output is a table of counts for the six possible alleles
   sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1), sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
   
-  # Convert this table into a data frame (badly)
+  # Convert this table into a data frame
   for (j in 1:length(alleles))
   {
     if (is.na(sampled_alleles[alleles[j]]))
@@ -213,33 +213,47 @@ model {
   for (sample_index in 1:num_samples)
   {
     # likelihood
-    # Number of reads that map to each allele is multinomial. 
-    # y and pi are vectors of length 6
-    y[sample_index] ~ dmulti(pi[sample_index], N[sample_index]) 
+    # Number of reads that map to each allele is multinomial.
+    # y and pi are matrices with num_samples rows and num_alleles columns
+    y[sample_index,1:num_alleles] ~ dmulti(pi[sample_index,1:num_alleles], N[sample_index])
+
+    # Dirichlet prior for proportion of population with allele in each sample
+    #
+    # This would be written like this:
+    # pi[sample_index,1:num_alleles] ~ ddirch(alpha[tissue[sample_index],1:num_alleles])T(0.0001,0.9999)
+    # Except JAGS doesn't allow the parameters of ddirch to be inferred
+    #
+    # Instead use the observation in the BUGS manual, and infer from a dgamma instead:
+    # 'The trick is to note that if delta[k] ~ dgamma(alpha[k], 1), then the vector with elements 
+    # delta[k] / sum(delta[1:K]), k = 1, ...,   K, is Dirichlet with parameters alpha[k], k = 1, ..., K.'
+    for (allele_index in 1:num_alleles)
+    {
+      pi[sample_index, allele_index] <- delta[sample_index, allele_index] / sum(delta[sample_index,])
+      delta[sample_index, allele_index] ~ dgamma(alpha[tissue[allele_index],allele_index], 1)
+    }
     
-    # Beta prior for proportion of population with allele in each sample
-    pi[sample_index] ~ ddirch(alpha[tissue[sample_index]])T(0.0001,0.9999)
   }
 
   # For each tissue (blood or csf) hyperpriors
   for (tissue_index in 1:num_tissues)
   {
-    # Convert a and b in beta prior, to mu and kappa 
-    # mu = mean allele for tissue, 
+    # Convert a and b in beta prior, to mu and kappa
+    # mu = mean allele for tissue,
     # kappa = how closely does sequence represent tissue - constant across all tissue types
-    alpha[tissue_index] <- mu[tissue_index] * kappa
-
-    # hyperpriors for mu (beta dist) 
-    mu[tissue_index] ~ ddirch(AlphaMu)
+    for (allele_index in 1:num_alleles)
+    {
+      alpha[tissue_index,allele_index] <- mu[tissue_index,allele_index] * kappa
+    }
+    # hyperpriors for mu (beta dist)
+    mu[tissue_index,1:num_alleles] ~ ddirch(AlphaMu[])
   }
 
   # Kappa hyperprior (gamma dist - shape and rate)
   kappa ~ dgamma(Skappa, Rkappa)
 
   # Top level constants for hyperpriors
-  # Beta dist for mu - estimated from Manso et al 2014 fig 4h
-  # 84 mice. A: 20; B: 10; C: 1; D: 3; E: 65; F: 1
-  AlphaMu <- c(20, 10, 1, 3, 65, 1)
+  # This is a vector of length num_alleles
+  AlphaMu <- alpha_priors
 
   # Gamma dist for kappa. First convert mean and sd to shape and rate
   Skappa <- pow(meanGamma,2)/pow(sdGamma,2)
@@ -251,13 +265,27 @@ model {
 "
 writeLines(jags_model2_spec,con="model2.txt")
 
-# Convert to a list for use with JAGS
-three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)), num_samples = length(three_prime_reads$TotalReads), tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads, y = three_prime_reads[,alleles])
+#
+# Convert data for model to a list for use with JAGS
+# 
+
+# Dirichlet dist for mu - estimated from Manso et al 2014 fig 4h
+# 84 mice. A: 20; B: 10; C: 1; D: 3; E: 65; F: 1
+# AlphaMu <- c(20, 10, 1, 3, 65, 1)
+manso_priors = c(20, 10, 1, 3, 65, 1)
+
+three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)), num_samples = length(three_prime_reads$TotalReads), num_alleles = length(alleles), tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads, y = as.matrix(three_prime_reads[,alleles]), alpha_priors = manso_priors)
 
 #
 # JAGS chain parameters
 #
 parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior distributions
+
+# Bigger model needs more steps.
+adapt_steps = 2000 
+burn_in_steps = 8000
+num_chains = 3
+num_save_steps = 100000
 
 #
 # Run the model
