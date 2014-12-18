@@ -32,7 +32,6 @@ alleles = c("A", "B", "C", "D", "E", "F")
 # Seed for rng - set to make reproducible
 rng_seed = 1
 
-
 # MCMC params
 adapt_steps = 500 
 burn_in_steps = 2000
@@ -138,7 +137,7 @@ cat( "Sampling iterations...\n" )
 coda_samples1 = coda.samples(jags_model1, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
 
 # Save the chain
-save(coda_samples1, file="chain1.Rdata")
+saveRDS(coda_samples1, file="chain1.Rdata")
 
 #
 # Use first model posteriors to produce data for second model
@@ -201,7 +200,7 @@ rm(mcmc_chain)
 three_prime_reads$TotalReads <- N
 
 # Save the converted data
-save(three_prime_reads, file="three_prime_reads.Rdata")
+saveRDS(three_prime_reads, file="three_prime_reads.Rdata")
 
 #
 # Run second model
@@ -304,4 +303,4 @@ cat( "Sampling iterations...\n" )
 coda_samples2 = coda.samples(jags_model2, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
 
 # Save the chain
-save(coda_samples2, file="chain2.Rdata")
+saveRDS(coda_samples2, file="chain2.Rdata")
