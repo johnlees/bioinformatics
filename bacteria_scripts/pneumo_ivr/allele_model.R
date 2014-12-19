@@ -6,7 +6,7 @@
 # Author: John Lees
 # 2014-2015
 #
-# Model based on elements of code for exercise 9.2 in 
+# Model based on elements of code for exercise 9.2 in
 # 'Doing Bayesian Data Analysis', 1st edition, Kruschke 2011
 #
 
@@ -34,7 +34,7 @@ alleles = c("A", "B", "C", "D", "E", "F")
 rng_seed = 1
 
 # MCMC params
-adapt_steps = 500 
+adapt_steps = 500
 burn_in_steps = 2000
 num_chains = 3
 num_save_steps = 50000
@@ -73,8 +73,8 @@ model {
   {
     # likelihood
     # Number of reads that map to one allele is binomial (i.e. 1.1 = success, 1.2 = failure)
-    y[sample_index] ~ dbin(theta[sample_index], N[sample_index]) 
-    
+    y[sample_index] ~ dbin(theta[sample_index], N[sample_index])
+
     # Beta prior for proportion of population with allele in each sample
     theta[sample_index] ~ dbeta(a[tissue[sample_index]], b[tissue[sample_index]])T(0.0001,0.9999)
   }
@@ -82,13 +82,13 @@ model {
   # For each tissue (blood or csf) hyperpriors
   for (tissue_index in 1:num_tissues)
   {
-    # Convert a and b in beta prior, to mu and kappa 
-    # mu = mean allele for tissue, 
+    # Convert a and b in beta prior, to mu and kappa
+    # mu = mean allele for tissue,
     # kappa = how closely does sequence represent tissue - constant across all tissue types
     a[tissue_index] <- mu[tissue_index] * kappa
     b[tissue_index] <- (1 - mu[tissue_index]) * kappa
 
-    # hyperpriors for mu (beta dist) 
+    # hyperpriors for mu (beta dist)
     mu[tissue_index] ~ dbeta(Amu, Bmu)
   }
 
@@ -133,15 +133,15 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   cat("Running first model\n\n")
-  jags_model1[i] = jags.model("model1.txt", data=five_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
+  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
   cat("MCMC burn in iterations...\n")
-  update(jags_model1[i], n.iter=burn_in_steps)
+  update(jags_model1[[i]], n.iter=burn_in_steps)
 
   # Converged chain
   cat( "Sampling iterations...\n" )
-  coda_samples[i] = coda.samples(jags_model1[i], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+  coda_samples[i] = coda.samples(jags_model1[[i]], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
 }
 
 # Add chains together as list, then save the run
@@ -173,23 +173,23 @@ for (i in 1:nrow(three_prime_reads)) {
   # Extract the column of the matrix
   col_name <- paste("theta[",i,"]",sep="")
   theta = mcmc_chain[,col_name]
-  
+
   # Sums of reads mapping to 1.1 and 1.2 respectively
   # This gives a distribution for sample size.
   reads <- hsd_mapping[i,seq(from=4, to=9)]
   Ndist <- theta*(sum(reads[c("V4", "V5", "V6")])) + (1-theta)*(sum(reads[c("V7", "V8", "V9")]))
   # Take a sample from it
   N[i] <- round(sample(Ndist,1))
-  
+
   # Number of reads mapping to 1.1, sampling from posterior for theta
   allele1 <- sum(sample(theta, N[i], replace=TRUE) > 0.5)
-  
+
   # Set up weighted sample for counts of alleles.
   weights1 = vet_weights(reads[c("V4","V5","V6")])
   weights2 = vet_weights(reads[c("V7","V8","V9")])
   # Output is a table of counts for the six possible alleles
   sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1), sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
-  
+
   # Convert this table into a data frame
   for (j in 1:length(alleles))
   {
@@ -234,14 +234,14 @@ model {
     # Except JAGS doesn't allow the parameters of ddirch to be inferred
     #
     # Instead use the observation in the BUGS manual, and infer from a dgamma instead:
-    # 'The trick is to note that if delta[k] ~ dgamma(alpha[k], 1), then the vector with elements 
+    # 'The trick is to note that if delta[k] ~ dgamma(alpha[k], 1), then the vector with elements
     # delta[k] / sum(delta[1:K]), k = 1, ...,   K, is Dirichlet with parameters alpha[k], k = 1, ..., K.'
     for (allele_index in 1:num_alleles)
     {
       pi[sample_index, allele_index] <- delta[sample_index, allele_index] / sum(delta[sample_index,])
       delta[sample_index, allele_index] ~ dgamma(alpha[tissue[allele_index],allele_index], 1)
     }
-    
+
   }
 
   # For each tissue (blood or csf) hyperpriors
@@ -277,7 +277,7 @@ writeLines(jags_model2_spec,con="model2.txt")
 
 #
 # Convert data for model to a list for use with JAGS
-# 
+#
 
 # Dirichlet dist for mu - estimated from Manso et al 2014 fig 4h
 # 84 mice. A: 20; B: 10; C: 1; D: 3; E: 65; F: 1
@@ -292,7 +292,7 @@ three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)), 
 parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior distributions
 
 # Bigger model needs more steps. Roughly ~4.5x as many nodes
-adapt_steps = 2000 
+adapt_steps = 2000
 burn_in_steps = 15000
 num_chains = 3
 num_save_steps = 100000
@@ -309,15 +309,15 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   cat("Running first model\n\n")
-  jags_model2[i] = jags.model("model1.txt", data=three_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2, n.chains=1, n.adapt=adapt_steps)
+  jags_model2[[i]] = jags.model("model1.txt", data=three_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2, n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
   cat("MCMC burn in iterations...\n")
-  update(jags_model2[i], n.iter=burn_in_steps)
+  update(jags_model2[[i]], n.iter=burn_in_steps)
 
   # Converged chain
   cat( "Sampling iterations...\n" )
-  coda_samples[i] = coda.samples(jags_model2[i], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+  coda_samples[i] = coda.samples(jags_model2[[i]], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
 }
 
 # Add chains together as list, then save the run
