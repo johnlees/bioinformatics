@@ -126,13 +126,14 @@ parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterio
 #
 
 # Use a different, but deterministic, seed for each chain
+cat("Running first model\n\n")
 jags_model1 <- NULL
 coda_samples <- NULL
 
 for (i in 1:num_chains)
 {
   # Create and adapt
-  cat("Running first model\n\n")
+  cat(sprintf("Chain %d of %d\n",i,num_chains))
   jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
@@ -302,13 +303,14 @@ num_save_steps = 100000
 #
 
 # Use a different, but deterministic, seed for each chain
+cat("Running second model\n\n")
 jags_model2 <- NULL
 coda_samples <- NULL
 
 for (i in 1:num_chains)
 {
   # Create and adapt
-  cat("Running first model\n\n")
+  print(sprintf("Chain %d of %d\n",i,num_chains))
   jags_model2[[i]] = jags.model("model1.txt", data=three_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2, n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
