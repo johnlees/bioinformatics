@@ -236,8 +236,10 @@ sub mark_dups($)
    my $dup_file = "$bam_file.dups";
    my $marked_bam = "marked_dups.$bam_file";
 
-   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file CREATE_INDEX=TRUE &> $log_file";
+   my $picard_command = "$java_location -Xmx2g -jar $picard_location MarkDuplicates VALIDATION_STRINGENCY=LENIENT INPUT=$bam_file OUTPUT=$marked_bam METRICS_FILE=$dup_file CREATE_INDEX=FALSE &> $log_file";
    system($picard_command);
+
+   system("samtools index $marked_bam");
 
    return $marked_bam;
 }

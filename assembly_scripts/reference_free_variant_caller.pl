@@ -512,6 +512,8 @@ else
       # bgzip and index
       system("sed -i -e 's/,PF/;PF/g' $fixed_vcf");
       system("bgzip $fixed_vcf");
+      $fixed_vcf .= ".gz";
+
       system($bcftools_location . " index $fixed_vcf.gz 2>> $bcftools_stderr_file");
    }
    # SGA variant calling
@@ -576,7 +578,7 @@ else
    }
 
    # Extract variant sites only
-   system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf.gz -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
+   system($bcftools_location . " view -C 2 -c 2 -f PASS $fixed_vcf -o $filtered_vcf -O z 2>> $bcftools_stderr_file");
    system($bcftools_location . " index $filtered_vcf 2>> $bcftools_stderr_file");
    assembly_common::add_tmp_file($bcftools_stderr_file);
 
