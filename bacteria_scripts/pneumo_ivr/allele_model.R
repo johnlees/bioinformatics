@@ -136,8 +136,8 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   cat(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data, l
-    ist(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
+  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data,
+    list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
   cat("MCMC burn in iterations...\n")
