@@ -514,7 +514,7 @@ else
       system("bgzip $fixed_vcf");
       $fixed_vcf .= ".gz";
 
-      system($bcftools_location . " index $fixed_vcf.gz 2>> $bcftools_stderr_file");
+      system($bcftools_location . " index $fixed_vcf 2>> $bcftools_stderr_file");
    }
    # SGA variant calling
    elsif (defined($sga))
