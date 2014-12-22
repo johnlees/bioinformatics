@@ -572,7 +572,7 @@ else
       assembly_common::add_tmp_file("$exons_file.gz");
       assembly_common::add_tmp_file("$exons_file.gz.tbi");
 
-      my $frameshift_vcf = assembly_common::random_string() . "$fixed_vcf";
+      my $frameshift_vcf = $fixed_vcf . assembly_common::random_string() . "vcf.gz";
       system("bcftools plugin frameshifts -O z -o $frameshift_vcf $fixed_vcf -- -e $exons_file.gz");
       rename $frameshift_vcf, $fixed_vcf;
    }
