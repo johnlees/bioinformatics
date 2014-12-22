@@ -116,7 +116,9 @@ writeLines(jags_model1_spec,con="model1.txt")
 five_prime_reads <- read.delim(five_prime_input)
 
 # Convert to a list for use with JAGS
-five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)), num_samples = length(five_prime_reads$TotalReads), tissue = five_prime_reads$Tissue, N = five_prime_reads$TotalReads, y = five_prime_reads$AReads)
+five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)),
+  num_samples = length(five_prime_reads$TotalReads), tissue = five_prime_reads$Tissue,
+  N = five_prime_reads$TotalReads, y = five_prime_reads$AReads)
 
 # JAGS chain parameters
 parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterior distributions
@@ -134,7 +136,8 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   cat(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
+  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data, l
+    ist(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
   cat("MCMC burn in iterations...\n")
@@ -189,7 +192,8 @@ for (i in 1:nrow(three_prime_reads)) {
   weights1 = vet_weights(reads[c("V4","V5","V6")])
   weights2 = vet_weights(reads[c("V7","V8","V9")])
   # Output is a table of counts for the six possible alleles
-  sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1), sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
+  sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1),
+    sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
 
   # Convert this table into a data frame
   for (j in 1:length(alleles))
@@ -285,7 +289,10 @@ writeLines(jags_model2_spec,con="model2.txt")
 # AlphaMu <- c(20, 10, 1, 3, 65, 1)
 manso_priors = c(20, 10, 1, 3, 65, 1)
 
-three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)), num_samples = length(three_prime_reads$TotalReads), num_alleles = length(alleles), tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads, y = as.matrix(three_prime_reads[,alleles]), alpha_priors = manso_priors)
+three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)),
+  num_samples = length(three_prime_reads$TotalReads), num_alleles = length(alleles),
+  tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads,
+  y = as.matrix(three_prime_reads[,alleles]), alpha_priors = manso_priors)
 
 #
 # JAGS chain parameters
@@ -311,7 +318,8 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   print(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model2[[i]] = jags.model("model1.txt", data=three_prime_data, list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2, n.chains=1, n.adapt=adapt_steps)
+  jags_model2[[i]] = jags.model("model1.txt", data=three_prime_data,
+    list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
   cat("MCMC burn in iterations...\n")
@@ -326,5 +334,5 @@ for (i in 1:num_chains)
 coda_samples2 <- mcmc.list(as.mcmc(coda_samples[]))
 saveRDS(coda_samples2, file="chain2.Rdata")
 
-rm(coda_samples, jags_model2)
+rm(coda_samples2, jags_model2)
 
