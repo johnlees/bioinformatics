@@ -305,9 +305,12 @@ burn_in_steps = 15000
 num_chains = 3
 num_save_steps = 100000
 
+num_iterations = ceiling((num_save_steps * thin_steps ) / num_chains)
+
 #
 # Run the model
 #
+# TODO: rewrite this into function
 
 # Use a different, but deterministic, seed for each chain
 cat("Running second model\n\n")
@@ -318,7 +321,7 @@ for (i in 1:num_chains)
 {
   # Create and adapt
   print(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model2[[i]] = jags.model("model1.txt", data=three_prime_data,
+  jags_model2[[i]] = jags.model("model2.txt", data=three_prime_data,
     list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2), n.chains=1, n.adapt=adapt_steps)
 
   # Burn-in
