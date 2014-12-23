@@ -15,6 +15,7 @@
 #
 library(coda)
 library(rjags)
+library(snow)
 
 #
 # Constants
@@ -30,22 +31,20 @@ three_prime_input <- paste(data_location, "ivr_mapped_alleles.txt", sep="")
 alleles = c("A", "B", "C", "D", "E", "F")
 
 # Seed for rng - set to make reproducible
-# Each chain uses the same seed, so runs are concatenated
+# Using rjags alone paralellises with plyr automatically, but seed is the same and
+# all chains are therefore the same.
+# Instead parallelise with snow and ClusterMap
 rng_seed = 1
+set.seed(rng_seed)
 
-# MCMC params
-adapt_steps = 500
-burn_in_steps = 2000
+# default MCMC params
 num_chains = 3
-num_save_steps = 50000
-thin_steps = 1
-
-# Steps per chain
-num_iterations = ceiling((num_save_steps * thin_steps ) / num_chains)
 
 #
 # Functions
 #
+
+# Assume column vectors that sum to zero are equally weighted
 vet_weights <- function(x) {
   if (sum(x) == 0)
   {
@@ -58,13 +57,45 @@ vet_weights <- function(x) {
   return(re_weighted)
 }
 
+# Code to adapt, burn in, and sample from jags chains
+run_chain <- function(
+  model_file,
+  chain_data,
+  chain_parameters,
+  chain_seed = sample(1:1000,1),
+  adapt_steps = 500,
+  burn_in_steps = 2000,
+  num_iterations = 20000,
+  thin_steps = 1){
+
+  # Create and adapt
+  jags_model = jags.model(model_file, data=chain_data,
+    list(.RNG.name="base::Mersenne-Twister", .RNG.seed=chain_seed), n.chains=1, n.adapt=adapt_steps)
+
+  # Burn-in
+  cat("MCMC burn in iterations...\n")
+  update(jags_model, n.iter=burn_in_steps)
+
+  # Converged chain
+  cat( "Sampling iterations...\n" )
+  coda_samples = coda.samples(jags_model, variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
+
+  return(coda_samples)
+}
+
+#
+# Main
+#
+
+# Set up cluster to parallelise chains. Make sure rjags available on all
+cl <- makeCluster(num_chains)
+clusterEvalQ(cl, library(rjags))
+
 #
 # Run model for first allele
 #
 
-#
 # Hierarchical model spec
-#
 jags_model1_spec = "
 # JAGS model specification
 model {
@@ -125,34 +156,28 @@ parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterio
 
 #
 # Run the model
+# Each chain in parallel using snow
 #
 
 # Use a different, but deterministic, seed for each chain
 cat("Running first model\n\n")
-jags_model1 <- NULL
-coda_samples <- NULL
 
-for (i in 1:num_chains)
-{
-  # Create and adapt
-  cat(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model1[[i]] = jags.model("model1.txt", data=five_prime_data,
-    list(.RNG.name="base::Mersenne-Twister", .RNG.seed=rng_seed+i), n.chains=1, n.adapt=adapt_steps)
-
-  # Burn-in
-  cat("MCMC burn in iterations...\n")
-  update(jags_model1[[i]], n.iter=burn_in_steps)
-
-  # Converged chain
-  cat( "Sampling iterations...\n" )
-  coda_samples[i] = coda.samples(jags_model1[[i]], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
-}
+# Need to export the parameters to each cluster
+clusterExport(cl,parameters)
+coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed, rng_seed+num_chains-1,1),
+  MoreArgs = list(model_file="model1.txt", chain_data=five_prime_data, chain_parameters=parameters,
+  burn_in_steps=2000, num_iterations=15000))
 
 # Add chains together as list, then save the run
-coda_samples1 <- mcmc.list(as.mcmc(coda_samples[]))
+# This command is a little complex:
+# clusterMap returns a list, each element is the return from a slave. i.e. a list of one element lists
+# Unlist this once to get mcmc.list objects of only one chain in each element
+# Convert these to mcmc objects
+# Put these into a single mcmc.list of num_chains mcmc elements, which is then used to downstream analysis
+coda_samples1 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
 saveRDS(coda_samples1, file="chain1.Rdata")
 
-rm(coda_samples, jags_model1)
+rm(coda_samples)
 
 #
 # Use first model posteriors to produce data for second model
@@ -299,43 +324,24 @@ three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)),
 #
 parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior distributions
 
-# Bigger model needs more steps. Roughly ~4.5x as many nodes
-adapt_steps = 2000
-burn_in_steps = 15000
-num_chains = 3
-num_save_steps = 100000
-
-num_iterations = ceiling((num_save_steps * thin_steps ) / num_chains)
-
 #
 # Run the model
+# Bigger model needs more steps. Roughly ~4.5x as many nodes
 #
-# TODO: rewrite this into function
 
-# Use a different, but deterministic, seed for each chain
 cat("Running second model\n\n")
-jags_model2 <- NULL
-coda_samples <- NULL
 
-for (i in 1:num_chains)
-{
-  # Create and adapt
-  print(sprintf("Chain %d of %d\n",i,num_chains))
-  jags_model2[[i]] = jags.model("model2.txt", data=three_prime_data,
-    list(.RNG.name="base::Mersenne-Twister", .RNG.seed=(rng_seed+i)*2), n.chains=1, n.adapt=adapt_steps)
-
-  # Burn-in
-  cat("MCMC burn in iterations...\n")
-  update(jags_model2[[i]], n.iter=burn_in_steps)
-
-  # Converged chain
-  cat( "Sampling iterations...\n" )
-  coda_samples[i] = coda.samples(jags_model2[[i]], variable.names=parameters, n.iter=num_iterations, thin=thin_steps)
-}
+# Re-export parameters
+clusterExport(cl,parameters)
+coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+num_chains,1),
+  MoreArgs = list(model_file="model2.txt", chain_data=three_prime_data, chain_parameters=parameters,
+  adapt_steps = 2000, burn_in_steps=15000, num_iterations=15000))
 
 # Add chains together as list, then save the run
-coda_samples2 <- mcmc.list(as.mcmc(coda_samples[]))
+coda_samples2 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
 saveRDS(coda_samples2, file="chain2.Rdata")
 
-rm(coda_samples2, jags_model2)
+rm(coda_samples2)
+
+stopCluster(cl)
 
