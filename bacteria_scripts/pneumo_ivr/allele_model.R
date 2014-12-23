@@ -22,10 +22,10 @@ library(snow)
 #
 
 # Data input
-data_location <- "~/Documents/PhD/hsd_locus/mapping/"
+data_location <- "~/Documents/PhD/hsd_locus/mapping"
 
-five_prime_input <- paste(data_location, "jags_5prime_input.txt", sep="")
-three_prime_input <- paste(data_location, "ivr_mapped_alleles.txt", sep="")
+five_prime_input <- paste(data_location, "jags_5prime_input.txt", sep="/")
+three_prime_input <- paste(data_location, "ivr_mapped_alleles.txt", sep="/")
 
 # Possible outcomes
 alleles = c("A", "B", "C", "D", "E", "F")
@@ -163,7 +163,7 @@ parameters = c("mu", "kappa", "theta", "a", "b") # Parameters to output posterio
 cat("Running first model\n\n")
 
 # Need to export the parameters to each cluster
-clusterExport(cl,parameters)
+clusterExport(cl,"parameters")
 coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed, rng_seed+num_chains-1,1),
   MoreArgs = list(model_file="model1.txt", chain_data=five_prime_data, chain_parameters=parameters,
   burn_in_steps=2000, num_iterations=15000))
@@ -332,7 +332,7 @@ parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior di
 cat("Running second model\n\n")
 
 # Re-export parameters
-clusterExport(cl,parameters)
+clusterExport(cl,"parameters")
 coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+num_chains,1),
   MoreArgs = list(model_file="model2.txt", chain_data=three_prime_data, chain_parameters=parameters,
   adapt_steps = 2000, burn_in_steps=15000, num_iterations=15000))
