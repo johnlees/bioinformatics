@@ -126,7 +126,7 @@ model {
   # Kappa hyperprior (gamma dist - shape and rate)
   kappa ~ dgamma(Skappa, Rkappa)
 
-  # Top level constants for hyperpriors
+  # Top level constants for hyperpriors. Same for blood and csf
   # Beta dist for mu - estimated from Manso et al 2014 fig 4h
   # 84 mice, 5% representation of allele 1.2 in blood
   Amu <- 80
@@ -175,9 +175,9 @@ coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed, rng_seed+num
 # Convert these to mcmc objects
 # Put these into a single mcmc.list of num_chains mcmc elements, which is then used to downstream analysis
 coda_samples1 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
-saveRDS(coda_samples1, file="chain1.Rdata")
-
 rm(coda_samples)
+
+saveRDS(coda_samples1, file="chain1.Rdata")
 
 #
 # Use first model posteriors to produce data for second model
@@ -221,6 +221,7 @@ for (i in 1:nrow(three_prime_reads)) {
     sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
 
   # Convert this table into a data frame
+  # Might be a better way than a loop
   for (j in 1:length(alleles))
   {
     if (is.na(sampled_alleles[alleles[j]]))
@@ -238,6 +239,7 @@ for (i in 1:nrow(three_prime_reads)) {
 
 rm(mcmc_chain)
 
+# Add in N column
 three_prime_reads$TotalReads <- N
 
 # Save the converted data
@@ -292,7 +294,7 @@ model {
   kappa ~ dgamma(Skappa, Rkappa)
 
   # Top level constants for hyperpriors
-  # This is a vector of length num_alleles
+  # This is a vector of length num_alleles, same for both blood and csf
   AlphaMu <- alpha_priors
 
   # Gamma dist for kappa. First convert mean and sd to shape and rate
@@ -305,15 +307,12 @@ model {
 "
 writeLines(jags_model2_spec,con="model2.txt")
 
-#
-# Convert data for model to a list for use with JAGS
-#
-
 # Dirichlet dist for mu - estimated from Manso et al 2014 fig 4h
 # 84 mice. A: 20; B: 10; C: 1; D: 3; E: 65; F: 1
 # AlphaMu <- c(20, 10, 1, 3, 65, 1)
 manso_priors = c(20, 10, 1, 3, 65, 1)
 
+# Convert data for model to a list for use with JAGS
 three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)),
   num_samples = length(three_prime_reads$TotalReads), num_alleles = length(alleles),
   tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads,
@@ -326,7 +325,7 @@ parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior di
 
 #
 # Run the model
-# Bigger model needs more steps. Roughly ~4.5x as many nodes
+# Bigger model needs more burn-in steps. Roughly ~4.5x as many nodes
 #
 
 cat("Running second model\n\n")
@@ -339,9 +338,9 @@ coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+n
 
 # Add chains together as list, then save the run
 coda_samples2 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
-saveRDS(coda_samples2, file="chain2.Rdata")
+rm(coda_samples)
 
-rm(coda_samples2)
+saveRDS(coda_samples2, file="chain2.Rdata")
 
 stopCluster(cl)
 
