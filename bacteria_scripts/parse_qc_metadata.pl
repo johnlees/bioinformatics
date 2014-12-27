@@ -51,6 +51,12 @@ else
       # Use strain regex if defined
       if ((!defined($strain_regex)) || ($strain_name =~ $strain_regex))
       {
+         # Standardise CSF sample names
+         if ($sample =~ /^(\d+)_I$/)
+         {
+            $sample = $1;
+         }
+
          # Put into hash of run_lane_tag vs sample id
          $lanes{$sample} = "$run" . "_$lane#$tag";
 
