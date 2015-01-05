@@ -25,7 +25,7 @@ close IVR;
 
 open(PAIRS, $ARGV[1]) || die ($usage);
 
-print "CSF_index\tBlood_index\n";
+print "Sample\tCSF_index\tBlood_index\n";
 while (my $line_in = <PAIRS>)
 {
    chomp $line_in;
@@ -34,7 +34,7 @@ while (my $line_in = <PAIRS>)
 
    if (defined($input{$csf}) && defined($input{$blood}))
    {
-      print $input{$csf} . "\t" . $input{$blood} . "\n";
+      print join("\t", $sample, $input{$csf}, $input{$blood} . "\n");
    }
 }
 
