@@ -7,6 +7,7 @@ use warnings;
 use Cwd 'abs_path';
 use File::Basename;
 use lib dirname( abs_path $0 );
+use lib dirname( abs_path $0 ) . "/..";
 
 use Getopt::Long;
 use File::Spec;
