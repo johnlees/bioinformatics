@@ -25,7 +25,7 @@ library(snow)
 data_location <- "~/Documents/PhD/hsd_locus/mapping"
 
 five_prime_input <- paste(data_location, "jags_5prime_input.txt", sep="/")
-three_prime_input <- paste(data_location, "ivr_mapped_alleles.txt", sep="/")
+three_prime_input <- paste(data_location, "jags_5prime_input.txt", sep="/")
 
 # Possible outcomes
 alleles = c("A", "B", "C", "D", "E", "F")
