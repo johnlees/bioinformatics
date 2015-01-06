@@ -93,7 +93,7 @@ else
          chdir $sample;
 
          open(READS, ">reads.txt") || die("Could not write to $sample/reads.txt\n");
-         print READS join("\t", $sample . "_csf", "$csf_lane" . "_1.fastq.gz", "$csf_lane" . "_2.fastq.gz\n",
+         print READS join("\t", $sample . "_csf", "$csf_lane" . "_1.fastq.gz", "$csf_lane" . "_2.fastq.gz\n" .
                                 $sample . "_blood", "$blood_lane" . "_1.fastq.gz", "$blood_lane" . "_2.fastq.gz");
          close READS;
       }
@@ -111,7 +111,7 @@ else
       mkdir "cortex";
       chdir "cortex";
 
-      my $bsub_cortex = "bsub -o logs/cortex.%J.o -e logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem";
+      my $bsub_cortex = "bsub -o ../logs/cortex.%J.o -e ../logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem";
       my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_directory/$csf_lane/improved_assembly.fa -g $assembly_directory/$csf_lane/annotation/annotation.gff --separate-correct -r reads.txt -o $sample";
 
       my $cortex_job = `$bsub_cortex $cortex_command`;
@@ -125,7 +125,7 @@ else
       mkdir "mapping";
       chdir "mapping";
 
-      my $bsub_mapping = "bsub -o logs/mapping.%J.o -e logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory";
+      my $bsub_mapping = "bsub -o ../logs/mapping.%J.o -e ../logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory";
       my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a -a $assembly_directory/$csf_lane/improved_assembly.fa -g $assembly_directory/$csf_lane/annotation/annotation.gff -r reads.txt -o $sample -p 1e-6";
       my $mapping_job = `$bsub_mapping $map_command`;
 
