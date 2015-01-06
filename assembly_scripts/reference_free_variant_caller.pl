@@ -307,11 +307,11 @@ sub reference_length($)
 }
 
 # Creates an index file for use by run_calls.pl
-sub create_cortex_index($)
+sub create_cortex_index($$)
 {
    # A reference to a hash of read locations
    # %$reads{sample}{direction}
-   my ($reads) = @_;
+   my ($reads, $samples) = @_;
 
    my $index_name = "INDEX";
 
@@ -319,7 +319,7 @@ sub create_cortex_index($)
    # pe reads, reverse pe reads. Empty fields marked by periods
    open(INDEX, ">$index_name") || die("Could not write to $index_name: $!\n");
 
-   foreach my $sample (keys %$reads)
+   foreach my $sample (@$samples)
    {
       my $pe_1 = $sample . "_pe_1";
       my $pe_2 = $sample . "_pe_2";
@@ -452,11 +452,11 @@ else
       my $index_name;
       if ($no_quake)
       {
-         $index_name = create_cortex_index($reads);
+         $index_name = create_cortex_index($reads, $samples);
       }
       else
       {
-         $index_name = create_cortex_index($quake_thread->join());
+         $index_name = create_cortex_index($quake_thread->join(), $samples);
       }
 
       my $approx_length = reference_length($assembly_file);
