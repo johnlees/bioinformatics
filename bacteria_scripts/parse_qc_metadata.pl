@@ -9,17 +9,18 @@ use Text::CSV;
 # Parses qc files from bacterial sequencing
 # At the moment set up to extract run, lane and tag of all paired isolates
 
-my $usage = "parse_qc_metadata.pl qc_file.csv > pairs.txt\nparse_qc_metadata.pl qc_file.csv --strain 'strain_regex' > pairs.txt\n";
+my $usage = "parse_qc_metadata.pl --file qc_file.csv > pairs.txt\nparse_qc_metadata.pl --file qc_file.csv --strain 'strain_regex' > pairs.txt\n";
 
 #
 # Main
 #
 
-my $metadata_in = $ARGV[0];
-
 # Use a regular expression for strain name compared to sample name if specified
-my ($strain_regex_in, $strain_regex);
-GetOptions("strain=s" => \$strain_regex_in);
+my ($strain_regex_in, $strain_regex, $mode, $metadata_in);
+GetOptions("strain=s" => \$strain_regex_in,
+           "file=s" => \$metadata_in,
+           "mode=s" => \$mode) || die("Could not parse input options\n");
+
 if (defined($strain_regex_in))
 {
    $strain_regex = qr/$strain_regex_in/;
@@ -38,7 +39,7 @@ else
    open my $metadata_csv, "<:encoding(utf8)", "$metadata_in" or die "$metadata_in: $!";
 
    my %lanes;
-   my @pairs;
+   my (@blood_samples, @csf_samples, @pairs);
 
    # Throw away header
    my $header = $csv->getline($metadata_csv);
@@ -63,33 +64,57 @@ else
          # Look for any blood isolates
          if ($sample =~ /^(\d+)_II$/)
          {
+            push(@blood_samples, $sample);
             push(@pairs, $1);
+         }
+         elsif ($sample =~ /^(\d+)$/)
+         {
+            push(@csf_samples, $sample);
          }
       }
    }
 
    close $metadata_csv;
 
-   # Print out lane, run and tag of each pair to stdout
-   print "Sample_ID\tCSF_lane\tblood_lane\n";
-
-   foreach my $paired_sample (@pairs)
+   if (!defined($mode) || $mode eq "pairs")
    {
-      my $csf_run = $lanes{$paired_sample};
-      my $blood_run = $lanes{$paired_sample . "_II"};
+      # Print out lane, run and tag of each pair to stdout
+      print "Sample_ID\tCSF_lane\tblood_lane\n";
 
-      if (!defined($csf_run))
+      foreach my $paired_sample (@pairs)
       {
-         print STDERR "Sample $paired_sample has no csf run recorded\n";
+         my $csf_run = $lanes{$paired_sample};
+         my $blood_run = $lanes{$paired_sample . "_II"};
+
+         if (!defined($csf_run))
+         {
+            print STDERR "Sample $paired_sample has no csf run recorded\n";
+         }
+         elsif (!defined($blood_run))
+         {
+            print STDERR "Sample $paired_sample has no blood run recorded\n";
+         }
+         else
+         {
+            print join("\t", $paired_sample, $csf_run, $blood_run) . "\n";
+         }
       }
-      elsif (!defined($blood_run))
+   }
+   elsif ($mode = "tissue")
+   {
+      foreach my $sample (@csf_samples)
       {
-         print STDERR "Sample $paired_sample has no blood run recorded\n";
+         print "$lanes{$sample}\tcsf\n";
       }
-      else
+
+      foreach my $sample (@blood_samples)
       {
-         print join("\t", $paired_sample, $csf_run, $blood_run) . "\n";
+         print "$lanes{$sample}\tblood\n";
       }
+   }
+   else
+   {
+      print STDERR "Unknown mode. Doing nothing\nUse either --mode pairs or --mode tissue\n";
    }
 }
 
