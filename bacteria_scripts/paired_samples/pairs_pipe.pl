@@ -73,8 +73,10 @@ else
    }
    chdir $output_directory;
 
-   open(LANES, $lane_file) || die("Could not open $lane_file\n");
    open(JOBS, ">pairs_pipe.txt") || die("Could not write to pairs_pipe.txt\n");
+   print JOBS join("\t", "Sample", "Cortex ID", "Map ID", "Concat ID") . "\n";
+
+   open(LANES, $lane_file) || die("Could not open $lane_file\n");
 
    while (my $lane_line = <LANES>)
    {
@@ -139,7 +141,7 @@ else
       $concat_job =~ $job_regex;
       my $job3_id = $1;
 
-      print JOBS join("\t", $job1_id, $job2_id, "$job3_id\n");
+      print JOBS join("\t", $sample, $job1_id, $job2_id, "$job3_id\n");
 
       chdir "..";
    }
