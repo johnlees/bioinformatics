@@ -140,7 +140,7 @@ else
       chdir "..";
 
       # bsub concat command, conditional on jobs finishing
-      my $concat_command = "bsub -w \"done($job1_id)\" -w \"done($job2_id)\" -o logs/combine.%J.o ~/bioinformatics/bacteria_scripts/paired_samples/combine_output.pl";
+      my $concat_command = "bsub -w \"done($job1_id) && done($job2_id)\" -o logs/combine.%J.o ~/bioinformatics/bacteria_scripts/paired_samples/combine_output.pl";
       my $concat_job = `$concat_command`;
 
       $concat_job =~ $job_regex;

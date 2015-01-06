@@ -331,8 +331,6 @@ else
          # Use Picard to remove duplicates (cannot rename output)
          my $improved_bam = mapping::mark_dups($bam);
 
-         $improved_bam =~ m/^(.+)\.bam$/;
-         assembly_common::add_tmp_file("$1.bai");
          assembly_common::add_tmp_file("$bam.picard.log");
          assembly_common::add_tmp_file("$bam.dups");
 
@@ -399,7 +397,9 @@ else
 
       my $frameshift_vcf = mapping::random_string() . $output_vcf;
       system("bcftools plugin frameshifts -O z -o $frameshift_vcf $output_vcf -- -e $exons_file.gz");
+
       rename $frameshift_vcf, $output_vcf;
+      system("bcftools index $output_vcf");
    }
 
    # Filter variants
