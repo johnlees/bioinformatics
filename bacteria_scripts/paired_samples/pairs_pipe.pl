@@ -137,18 +137,17 @@ else
       $mapping_job =~ $job_regex;
       my $job2_id = $1;
 
-      chdir "..";
+      chdir "../..";
 
       # bsub concat command, conditional on jobs finishing
-      my $concat_command = "bsub -w \"done($job1_id) && done($job2_id)\" -o logs/combine.%J.o ~/bioinformatics/bacteria_scripts/paired_samples/combine_output.pl";
+      my $concat_command = "bsub -w \"done($job1_id) && done($job2_id)\" -o logs/combine.%J.log " .
+      "~/bioinformatics/bacteria_scripts/paired_samples/combine_output.pl --cortex $sample/cortex --map $sample/mapping --output $sample";
       my $concat_job = `$concat_command`;
 
       $concat_job =~ $job_regex;
       my $job3_id = $1;
 
       print JOBS join("\t", $sample, $job1_id, $job2_id, "$job3_id\n");
-
-      chdir "..";
    }
    close LANES;
    close JOBS;
