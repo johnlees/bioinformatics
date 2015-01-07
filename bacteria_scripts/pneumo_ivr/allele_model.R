@@ -203,19 +203,20 @@ for (i in 1:nrow(three_prime_reads)) {
   col_name <- paste("theta[",i,"]",sep="")
   theta = mcmc_chain[,col_name]
 
+  # Set up weighted sample for counts of alleles.
+  reads <- hsd_mapping[i,seq(from=4, to=9)]
+  weights1 = vet_weights(reads[c("V4","V5","V6")])
+  weights2 = vet_weights(reads[c("V7","V8","V9")])
+
   # Sums of reads mapping to 1.1 and 1.2 respectively
   # This gives a distribution for sample size.
-  reads <- hsd_mapping[i,seq(from=4, to=9)]
-  Ndist <- theta*(sum(reads[c("V4", "V5", "V6")])) + (1-theta)*(sum(reads[c("V7", "V8", "V9")]))
+  Ndist <- theta*(sum(weights1)) + (1-theta)*(sum(weights2))
   # Take a sample from it
   N[i] <- round(sample(Ndist,1))
 
   # Number of reads mapping to 1.1, sampling from posterior for theta
   allele1 <- sum(sample(theta, N[i], replace=TRUE) > 0.5)
 
-  # Set up weighted sample for counts of alleles.
-  weights1 = vet_weights(reads[c("V4","V5","V6")])
-  weights2 = vet_weights(reads[c("V7","V8","V9")])
   # Output is a table of counts for the six possible alleles
   sampled_alleles <- table(c(sample(c("A","B","E"),allele1,replace=TRUE,prob=weights1),
     sample(c("D","C","F"),N[i]-allele1,replace=TRUE,prob=weights2)))
