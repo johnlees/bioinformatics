@@ -28,6 +28,8 @@ of samples
 
    (Optional)
    --output          Output directory. Default ./
+   --dirty           Leave all logs and intermediate output in place
+                     (~8Gb per pair)
 
    -h, --help        Shows this help.
 
@@ -55,10 +57,11 @@ sub get_fastq($$)
 #**********************************************************************#
 #* Main                                                               *#
 #**********************************************************************#
-my ($lane_file, $assembly_directory, $output_directory, $help);
+my ($lane_file, $assembly_directory, $output_directory, $dirty, $help);
 GetOptions("lanes=s" => \$lane_file,
            "output|o=s" => \$output_directory,
            "assembly_dir=s" => \$assembly_directory,
+           "dirty" => \$dirty,
            "help|h" => \$help) || die("$!\n$usage_message");
 
 # Parse options
@@ -118,6 +121,10 @@ else
 
       my $bsub_cortex = "bsub -o ../logs/cortex.%J.o -e ../logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem";
       my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_location -g $annotation_location --separate-correct -r ../reads.txt -o $sample";
+      if ($dirty)
+      {
+         $cortex_command .= " --dirty";
+      }
 
       my $cortex_job = `$bsub_cortex $cortex_command`;
       # Job <3849944> is submitted to default queue <normal>
@@ -132,8 +139,12 @@ else
 
       my $bsub_mapping = "bsub -o ../logs/mapping.%J.o -e ../logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory";
       my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a $assembly_location -g $annotation_location -r ../reads.txt -o $sample -p 1e-6";
-      my $mapping_job = `$bsub_mapping $map_command`;
+      if ($dirty)
+      {
+         $map_command .= " --dirty";
+      }
 
+      my $mapping_job = `$bsub_mapping $map_command`;
       $mapping_job =~ $job_regex;
       my $job2_id = $1;
 

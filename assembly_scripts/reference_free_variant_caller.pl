@@ -228,6 +228,7 @@ sub prepare_reference($)
    # Standardise contig names
    assembly_common::standardise_contig_names($reference_file, $ref_new);
    assembly_common::add_tmp_file($ref_new);
+   assembly_common::add_tmp_file("$ref_new.fai");
 
    # Put assembly.fa location into file for cortex input
    system("echo $ref_new > $ref_se");
