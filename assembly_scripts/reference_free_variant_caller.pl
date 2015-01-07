@@ -228,7 +228,6 @@ sub prepare_reference($)
    # Standardise contig names
    assembly_common::standardise_contig_names($reference_file, $ref_new);
    assembly_common::add_tmp_file($ref_new);
-   assembly_common::add_tmp_file("$ref_new.fai");
 
    # Put assembly.fa location into file for cortex input
    system("echo $ref_new > $ref_se");
@@ -585,7 +584,8 @@ else
 
    # normalise indels w/ bcftools norm
    my $realigned_name = $filtered_vcf . assembly_common::random_string();
-   system("bcftools norm -f $assembly_file -O z -o $realigned_name $filtered_vcf");
+   system("bcftools norm -c w -f $assembly_file -O z -o $realigned_name $filtered_vcf");
+   assembly_common::add_tmp_file("$assembly_file.fai");
 
    rename $realigned_name, $filtered_vcf;
    system("bcftools index -f $filtered_vcf");
