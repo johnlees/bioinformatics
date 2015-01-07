@@ -334,7 +334,7 @@ cat("Running second model\n\n")
 clusterExport(cl,"parameters")
 coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+num_chains,1),
   MoreArgs = list(model_file="model2.txt", chain_data=three_prime_data, chain_parameters=parameters,
-  adapt_steps = 2000, burn_in_steps=15000, num_iterations=15000))
+  adapt_steps = 3500, burn_in_steps=30000, num_iterations=15000))
 
 # Add chains together as list, then save the run
 coda_samples2 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
