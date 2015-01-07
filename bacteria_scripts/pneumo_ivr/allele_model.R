@@ -206,6 +206,11 @@ for (i in 1:nrow(three_prime_reads)) {
   # Sums of reads mapping to 1.1 and 1.2 respectively
   # This gives a distribution for sample size.
   reads <- hsd_mapping[i,seq(from=4, to=9)]
+  if (sum(reads) == 0)
+  {
+    reads[1,] = c(rep(1,times=length(reads)))
+  }
+  
   Ndist <- theta*(sum(reads[c("V4", "V5", "V6")])) + (1-theta)*(sum(reads[c("V7", "V8", "V9")]))
   # Take a sample from it
   N[i] <- round(sample(Ndist,1))
