@@ -30,6 +30,12 @@ of samples
    --output          Output directory. Default ./
    --dirty           Leave all logs and intermediate output in place
                      (~8Gb per pair)
+   --mem             String for lsf memory, comma separated cortex then
+                     mapping. Default 2000,4000
+
+   --cortex          Run cortex step only
+   --map             Run map step only
+
 
    -h, --help        Shows this help.
 
@@ -57,11 +63,14 @@ sub get_fastq($$)
 #**********************************************************************#
 #* Main                                                               *#
 #**********************************************************************#
-my ($lane_file, $assembly_directory, $output_directory, $dirty, $help);
+my ($lane_file, $assembly_directory, $output_directory, $dirty, $mem_string, $no_symlinks, $cortex_only, $map_only, $help);
 GetOptions("lanes=s" => \$lane_file,
            "output|o=s" => \$output_directory,
            "assembly_dir=s" => \$assembly_directory,
            "dirty" => \$dirty,
+           "cortex" => \$cortex_only,
+           "map" => \$map_only,
+           "mem=s" => \$mem_string,
            "help|h" => \$help) || die("$!\n$usage_message");
 
 # Parse options
@@ -76,6 +85,12 @@ else
       $output_directory = "./";
    }
    chdir $output_directory;
+
+   # User defined mem limits
+   if (defined($mem_string))
+   {
+      ($cortex_mem, $map_memory) = split(",", $mem_string);
+   }
 
    open(JOBS, ">pairs_pipe.txt") || die("Could not write to pairs_pipe.txt\n");
    print JOBS join("\t", "Sample", "Cortex ID", "Map ID", "Concat ID") . "\n";
@@ -116,42 +131,72 @@ else
       my $annotation_location = File::Spec->rel2abs("$assembly_directory/$1_$2/annotation/$1_$2.gff");
 
       # bsub cortex
-      mkdir "cortex";
-      chdir "cortex";
-
-      my $bsub_cortex = "bsub -o ../logs/cortex.%J.o -e ../logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem";
-      my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_location -g $annotation_location --separate-correct -r ../reads.txt -o $sample";
-      if ($dirty)
+      my $job1_id;
+      unless ($map_only)
       {
-         $cortex_command .= " --dirty";
+         mkdir "cortex";
+         chdir "cortex";
+
+         my $bsub_cortex = "bsub -o ../logs/cortex.%J.o -e ../logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem";
+         my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_location -g $annotation_location --separate-correct -r ../reads.txt -o $sample";
+         if ($dirty)
+         {
+            $cortex_command .= " --dirty";
+         }
+
+         my $cortex_job = `$bsub_cortex $cortex_command`;
+         # Job <3849944> is submitted to default queue <normal>
+         $cortex_job =~ $job_regex;
+         $job1_id = $1;
+
+         chdir "..";
       }
-
-      my $cortex_job = `$bsub_cortex $cortex_command`;
-      # Job <3849944> is submitted to default queue <normal>
-      $cortex_job =~ $job_regex;
-      my $job1_id = $1;
-
-      chdir "..";
+      else
+      {
+         $job1_id = "n.a.";
+      }
 
       # bsub mapping
-      mkdir "mapping";
-      chdir "mapping";
-
-      my $bsub_mapping = "bsub -o ../logs/mapping.%J.o -e ../logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory";
-      my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a $assembly_location -g $annotation_location -r ../reads.txt -o $sample -p 1e-6";
-      if ($dirty)
+      my $job2_id;
+      unless ($cortex_only)
       {
-         $map_command .= " --dirty";
+         mkdir "mapping";
+         chdir "mapping";
+
+         my $bsub_mapping = "bsub -o ../logs/mapping.%J.o -e ../logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory";
+         my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a $assembly_location -g $annotation_location -r ../reads.txt -o $sample -p 1e-6";
+         if ($dirty)
+         {
+            $map_command .= " --dirty";
+         }
+
+         my $mapping_job = `$bsub_mapping $map_command`;
+         $mapping_job =~ $job_regex;
+         $job2_id = $1;
+
+         chdir "../..";
+      }
+      else
+      {
+         chdir "..";
+         $job2_id = "n.a.";
+      }
+      # bsub concat command, conditional on jobs finishing
+      my $condition;
+      if ($job1_id eq "n.a.")
+      {
+         $condition = "\"done($job2_id)\"";
+      }
+      elsif ($job2_id eq "n.a.")
+      {
+         $condition = "\"done($job1_id)\"";
+      }
+      else
+      {
+         $condition = "\"done($job1_id) && done($job2_id)\"";
       }
 
-      my $mapping_job = `$bsub_mapping $map_command`;
-      $mapping_job =~ $job_regex;
-      my $job2_id = $1;
-
-      chdir "../..";
-
-      # bsub concat command, conditional on jobs finishing
-      my $concat_command = "bsub -q small -w \"done($job1_id) && done($job2_id)\" -o $sample/logs/combine.%J.log " .
+      my $concat_command = "bsub -q small -w $condition -o $sample/logs/combine.%J.log " .
       "~/bioinformatics/bacteria_scripts/paired_samples/combine_output.pl --cortex $sample/cortex --map $sample/mapping --output $sample";
       my $concat_job = `$concat_command`;
 
