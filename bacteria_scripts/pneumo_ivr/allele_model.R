@@ -289,14 +289,17 @@ model {
     # kappa = how closely does sequence represent tissue - constant across all tissue types
     for (allele_index in 1:num_alleles)
     {
-      alpha[tissue_index,allele_index] <- mu[tissue_index,allele_index] * kappa
+      alpha[tissue_index,allele_index] <- mu[tissue_index,allele_index] * kappa[allele_index]
     }
     # hyperpriors for mu (beta dist)
     mu[tissue_index,1:num_alleles] ~ ddirch(AlphaMu[])
   }
 
   # Kappa hyperprior (gamma dist - shape and rate)
-  kappa ~ dgamma(Skappa, Rkappa)
+  for (allele_index in 1:num_alleles)
+  {
+    kappa[allele_index] ~ dgamma(Skappa, Rkappa)
+  }
 
   # Top level constants for hyperpriors
   # This is a vector of length num_alleles, same for both blood and csf
@@ -306,8 +309,13 @@ model {
   Skappa <- pow(meanGamma,2)/pow(sdGamma,2)
   Rkappa <- meanGamma/pow(sdGamma,2)
 
-  meanGamma <- 10
-  sdGamma <- 10
+  meanGamma ~ dunif(Lmu, Hmu)
+  sdGamma ~ dunif(Lsigma, Hsigma)
+
+  Lmu <- 0.01
+  Hmu <- 30
+  Lsigma <- 0.01
+  Hsigma <- 30
 }
 "
 writeLines(jags_model2_spec,con="model2.txt")
@@ -330,7 +338,7 @@ parameters = c("mu", "kappa", "pi", "alpha") # Parameters to output posterior di
 
 #
 # Run the model
-# Bigger model needs more burn-in steps. Roughly ~4.5x as many nodes
+# Bigger model. Roughly ~4.5x as many nodes
 #
 
 cat("Running second model\n\n")
@@ -339,7 +347,7 @@ cat("Running second model\n\n")
 clusterExport(cl,"parameters")
 coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+num_chains,1),
   MoreArgs = list(model_file="model2.txt", chain_data=three_prime_data, chain_parameters=parameters,
-  adapt_steps = 3500, burn_in_steps=30000, num_iterations=15000))
+  adapt_steps = 2000, burn_in_steps=10000, num_iterations=15000))
 
 # Add chains together as list, then save the run
 coda_samples2 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
