@@ -21,20 +21,28 @@ while (my $line_in = <PAIRS>)
       chdir $sample;
 
       my $vcf_name = "$sample.vcf.gz";
-      my $indels = `bcftools view -H -v indels $vcf_name | wc -l`;
-      chomp($indels);
 
-      my $snps = `bcftools view -H -v snps $vcf_name | wc -l`;
-      chomp($snps);
+      if (-e $vcf_name)
+      {
+         my $indels = `bcftools view -H -v indels $vcf_name | wc -l`;
+         chomp($indels);
 
-      my $total = $snps + $indels;
+         my $snps = `bcftools view -H -v snps $vcf_name | wc -l`;
+         chomp($snps);
 
-      my $genes = `bcftools query -f '%GENE\n' $vcf_name`;
-      my @gene_list = split("\n", $genes);
+         my $total = $snps + $indels;
 
-      pop(@gene_list);
+         my $genes = `bcftools query -f '%GENE\n' $vcf_name`;
+         my @gene_list = split("\n", $genes);
 
-      print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
+         pop(@gene_list);
+
+         print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
+      }
+      else
+      {
+         print STDERR "$sample has no vcf\n";
+      }
 
       chdir "..";
    }
