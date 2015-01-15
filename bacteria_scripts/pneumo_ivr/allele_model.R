@@ -210,7 +210,7 @@ for (i in 1:nrow(three_prime_reads)) {
   {
     reads[1,] = c(rep(1,times=length(reads)))
   }
-  
+
   Ndist <- theta*(sum(reads[c("V4", "V5", "V6")])) + (1-theta)*(sum(reads[c("V7", "V8", "V9")]))
   # Take a sample from it
   N[i] <- round(sample(Ndist,1))
@@ -309,13 +309,8 @@ model {
   Skappa <- pow(meanGamma,2)/pow(sdGamma,2)
   Rkappa <- meanGamma/pow(sdGamma,2)
 
-  meanGamma ~ dunif(Lmu, Hmu)
-  sdGamma ~ dunif(Lsigma, Hsigma)
-
-  Lmu <- 0.01
-  Hmu <- 30
-  Lsigma <- 0.01
-  Hsigma <- 30
+  meanGamma <- 2
+  sdGamma <- 2
 }
 "
 writeLines(jags_model2_spec,con="model2.txt")
@@ -347,7 +342,7 @@ cat("Running second model\n\n")
 clusterExport(cl,"parameters")
 coda_samples = clusterMap(cl, run_chain, chain_seed = seq(rng_seed+1, rng_seed+num_chains,1),
   MoreArgs = list(model_file="model2.txt", chain_data=three_prime_data, chain_parameters=parameters,
-  adapt_steps = 2000, burn_in_steps=10000, num_iterations=15000))
+  adapt_steps = 2000, burn_in_steps=30000, num_iterations=45000, thin_steps=3))
 
 # Add chains together as list, then save the run
 coda_samples2 <- mcmc.list(as.mcmc(unlist(coda_samples[],recursive=FALSE)))
