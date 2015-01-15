@@ -22,7 +22,10 @@ while (my $line_in = <PAIRS>)
 
       my $vcf_name = "$sample.vcf.gz";
       my $indels = `bcftools view -H -v indels $vcf_name | wc -l`;
+      chomp($indels);
+
       my $snps = `bcftools view -H -v snps $vcf_name | wc -l`;
+      chomp($snps);
 
       my $total = $snps + $indels;
 
@@ -32,6 +35,8 @@ while (my $line_in = <PAIRS>)
       pop(@gene_list);
 
       print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
+
+      chdir "..";
    }
    else
    {
