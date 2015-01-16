@@ -10,7 +10,8 @@ my $discordant_samples;
 my %discordant_alleles;
 my %discordant;
 
-my $lines = `wc -l $pair_file`;
+my $wc = `wc -l $pair_file`;
+my ($null, $lines, $file) = split(/\s+/, $wc);
 my $num_samples = ($lines - 3)/6;
 
 my $header = <PAIRS>;
