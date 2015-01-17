@@ -17,6 +17,7 @@ use Bio::SeqIO;
 use compare_variants;
 
 my $min_ident = 90;
+my $blat_log = "blat.log";
 my $lane_regex = qr/^(\d+_\d+)#(\d+)$/;
 
 # Rename lane
@@ -78,7 +79,7 @@ while (my $line_in = <PAIRS>)
    $all_genes{blood} = gene_list("$proteome_dir/$blood_lane.gff.proteome.faa");
 
    # Protein BLAT with high identifity
-   my $blat_command = "blat -prot out=blast8 -minIdentity=$min_ident $proteome_dir/$csf_lane.gff.proteome.faa $proteome_dir/$blood_lane.gff.proteome.faa $sample.blat.psl";
+   my $blat_command = "blat -prot out=blast8 -minIdentity=$min_ident $proteome_dir/$csf_lane.gff.proteome.faa $proteome_dir/$blood_lane.gff.proteome.faa $sample.blat.psl >> $blat_log";
    system($blat_command);
 
    open(BLAT, "$sample.blat.psl") || die("Could not open $sample.blat.psl\n");
