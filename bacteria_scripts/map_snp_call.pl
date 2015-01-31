@@ -210,15 +210,7 @@ else
    }
 
    # Get array of samples and hash of read locations
-   my ($samples, $reads);
-   if ($smalt)
-   {
-      ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 0);
-   }
-   else
-   {
-      ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
-   }
+   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
 
    # Index reference. Need to rename contigs as in annotation for annotation
    # transfer to vcf later
