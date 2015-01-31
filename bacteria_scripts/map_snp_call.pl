@@ -210,7 +210,15 @@ else
    }
 
    # Get array of samples and hash of read locations
-   my ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
+   my ($samples, $reads);
+   if ($smalt)
+   {
+      ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 0);
+   }
+   else
+   {
+      ($samples, $reads) = quake_wrapper::parse_read_file($read_file, 1);
+   }
 
    # Index reference. Need to rename contigs as in annotation for annotation
    # transfer to vcf later
@@ -270,6 +278,12 @@ else
       my @map_threads;
       for (my $thread = 1; $thread <= $mapping_threads; $thread++)
       {
+         # Exit loop if all samples mapped
+         if ($i+$thread > scalar(@$samples))
+         {
+            last;
+         }
+
          my $sample = $$samples[$i+$thread-1];
          my $forward_reads = $$reads{$sample}{"forward"};
          my $reverse_reads = $$reads{$sample}{"backward"};
