@@ -597,7 +597,7 @@ elsif (defined($map))
       $input_bam = $output_prefix . ".bam";
 
       # Map to D39 reference with bwa
-      my $bam_name = mapping::bwa_mem("$ref_dir/$ref_prefix", $output_prefix, $forward_reads, $reverse_reads);
+      my $bam_name = mapping::run_bwa("$ref_dir/$ref_prefix", $output_prefix, $forward_reads, $reverse_reads);
       rename $bam_name, $input_bam;
 
       system("samtools index $input_bam");

@@ -147,7 +147,7 @@ sub snap_index($)
 }
 
 # Run bwa mem, producing sorted and indexed bam. Returns location of this bam
-sub bwa_mem($$$$;$)
+sub run_bwa($$$$;$)
 {
    my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads) = @_;
 
@@ -184,19 +184,24 @@ sub bwa_index($)
 
 # Uses smalt to map paired end reads to an indexed reference. Returns the
 # location of the sorted, indexed bam file produced
-sub run_smalt($$$$)
+sub run_smalt($$$$;$)
 {
-   my ($reference_name, $sample_name, $forward_reads, $reverse_reads) = @_;
+   my ($reference_name, $sample_name, $forward_reads, $reverse_reads, $threads) = @_;
 
    if (!-e "$reference_name.smi")
    {
       smalt_index($reference_name);
    }
 
+   if (!defined($threads))
+   {
+      $threads = 1;
+   }
+
    my $output_name = "$sample_name.mapping.bam";
    my $log_file = "$sample_name.mapping.log";
 
-   my $smalt_command = "smalt map -f samsoft -p -i $smalt_max_insert $reference_name $forward_reads $reverse_reads 2> $log_file | samtools fixmate -O bam - $output_name";
+   my $smalt_command = "smalt map -f samsoft -p -r 0 -x -n $threads -i $smalt_max_insert $reference_name $forward_reads $reverse_reads 2> $log_file | samtools fixmate -O bam - $output_name";
    system($smalt_command);
 
    sort_bam($output_name);
