@@ -9,7 +9,7 @@ my $pairs_file = $ARGV[1];
 
 open(PAIRS, $pairs_file) || die("Could not open $pairs_file\n");
 
-unless ($mode = "genes")
+unless ($mode eq "genes")
 {
    print join("\t", "Sample", "SNPs", "INDELs", "Total", "Genes") . "\n";
 }
@@ -40,7 +40,7 @@ while (my $line_in = <PAIRS>)
          my $genes = `bcftools query -f '%GENE\n' $vcf_name`;
          my @gene_list = split("\n", $genes);
 
-         unless ($mode = "genes")
+         unless ($mode eq "genes")
          {
             print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
          }
