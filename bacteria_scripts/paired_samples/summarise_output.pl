@@ -40,6 +40,14 @@ while (my $line_in = <PAIRS>)
          my $genes = `bcftools query -f '%GENE\n' $vcf_name`;
          my @gene_list = split("\n", $genes);
 
+         for (my $i = 0; $i < scalar(@gene_list); $i++)
+         {
+            if ($gene_list[$i] =~ /^(.+)_(\d+)$/)
+            {
+               $gene_list[$i] = $1;
+            }
+         }
+
          unless ($mode eq "genes")
          {
             print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
