@@ -374,6 +374,7 @@ else
 
    # Call variants, running mpileup and then calling through a pipe
    print STDERR "variant calling...\n\n";
+   my $mpileup_vcf = "$output_prefix.mpileup.bcf";
    my $output_vcf = "$output_prefix.vcf.gz";
 
    # Write a sample file, defining all as haploid
@@ -388,11 +389,16 @@ else
    assembly_common::add_tmp_file($sample_file);
 
    # Use prior if given
-   my $calling_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -L $mpileup_L -d $max_depth -t DP,SP -ug -p -L $indel_cov_lim -f $reference_file $merged_bam | bcftools call -vm -S $sample_file -O z -o $output_vcf";
+   my $mpileup_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -L $mpileup_L -d $max_depth -t DP,SP -g -o $mpileup_vcf -p -L $indel_cov_lim -f $reference_file $merged_bam";
+   print STDERR "$mpileup_command\n";
+   system($mpileup_command);
+
+   my $calling_command = "bcftools call -vm -S $sample_file -O z -o $output_vcf";
    if (defined($prior))
    {
       $calling_command .= " -P $prior";
    }
+   $calling_command .= " $mpileup_vcf";
 
    print STDERR "$calling_command\n";
    system($calling_command);
