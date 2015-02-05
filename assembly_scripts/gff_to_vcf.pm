@@ -57,6 +57,10 @@ sub transfer_annotation($$)
       {
          $contig = $1;
       }
+      else
+      {
+         $contig = $feature->seq_id();
+      }
 
       #Check if gene is labelled
       my $gene;
