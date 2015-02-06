@@ -14,6 +14,7 @@
 # Libraries
 #
 library(rstan)
+library(parallel)
 
 #
 # Constants
@@ -113,8 +114,16 @@ five_prime_data = list(num_tissues = length(unique(five_prime_reads$Tissue)),
 #
 # Run the model
 #
-fit <- stan(file = 'stan_model1.txt', data = five_prime_data, 
-            iter = 1000, chains = 3)
+fit1 <- stan(file = 'stan_model1.txt', data = five_prime_data, 
+            iter = 1000, chains = 0)
+sflist <- 
+    mclapply(1:4, mc.cores = 2, 
+             function(i) stan(fit = fit1, data = five_prime_data, 
+                              seed = rng_seed, 
+                              chains = 1, chain_id = i, 
+                              refresh = -1))
+
+fit <- sflist2stanfit(sflist)
 
 pdf("model1.pdf")
 plot(fit)
