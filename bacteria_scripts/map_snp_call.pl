@@ -392,6 +392,7 @@ else
    my $mpileup_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -L $mpileup_L -d $max_depth -t DP,SP -g -o $mpileup_vcf -p -L $indel_cov_lim -f $reference_file $merged_bam";
    print STDERR "$mpileup_command\n";
    system($mpileup_command);
+   assembly_common::add_tmp_file($mpileup_vcf);
 
    my $calling_command = "bcftools call -vm -S $sample_file -O z -o $output_vcf";
    if (defined($prior))
