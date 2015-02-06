@@ -143,7 +143,7 @@ sub snap_index($)
       mkdir "snap_index";
    }
 
-   system("$snap_location index $reference_name snap_index -large 1>&2");
+   system("$snap_location index $reference_name snap_index -large -bSpace -B| 1>&2");
 }
 
 # Run bwa mem, producing sorted and indexed bam. Returns location of this bam
