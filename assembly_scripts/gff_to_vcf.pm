@@ -51,9 +51,19 @@ sub transfer_annotation($$)
 
    while (my $feature = $gff_io->next_feature())
    {
+      # Skip in an entire contig annotation
+      if ($feature->primary_tag eq "databank_entry")
+      {
+         next;
+      }
+
       # First parse contig number
       my $contig;
       if ($feature->seq_id() =~ /^.+\|.+\|(.+)$/)
+      {
+         $contig = $1;
+      }
+      elsif ($feature->seq_id() =~ /^(.+) .+$/)
       {
          $contig = $1;
       }
@@ -64,7 +74,7 @@ sub transfer_annotation($$)
 
       #Check if gene is labelled
       my $gene;
-      if ($feature->has_tag("gene"))
+      if ($feature->primary_tag eq "CDS" && $feature->has_tag("gene"))
       {
          my @genes = $feature->get_tag_values("gene");
          $gene = pop(@genes);
@@ -102,8 +112,10 @@ sub transfer_annotation($$)
    system("$bcftools index -f $vcf_file 2>> $stderr_file");
 
    # Finally, remove temporary files
-   unlink "$tmp_annotation.gz", "$tmp_annotation.gz.tbi", $annotation_header_file;
    assembly_common::add_tmp_file($stderr_file);
+   assembly_common::add_tmp_file("$tmp_annotation.gz");
+   assembly_common::add_tmp_file("$tmp_annotation.gz.tbi");
+   assembly_common::add_tmp_file($annotation_header_file);
 }
 
 # Creates a file of exons for use with frameshift annotation
