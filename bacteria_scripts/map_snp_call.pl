@@ -36,7 +36,7 @@ my $indel_cov_lim = 1000;
 
 my $mpileup_C = 50;
 my $mpileup_m = 2;
-my $mpileup_L = 0.0005;
+my $mpileup_F = 0.0005;
 
 # VCF filters
 my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"1\" && PL[1]/PL[0] > 0.75)", "QUAL < 50", "MQ < 30", "SP > 30", "MQSB < 0.001", "RPB < 0.001");
@@ -389,7 +389,7 @@ else
    assembly_common::add_tmp_file($sample_file);
 
    # Use prior if given
-   my $mpileup_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -L $mpileup_L -d $max_depth -t DP,SP -g -o $mpileup_vcf -p -L $indel_cov_lim -f $reference_file $merged_bam";
+   my $mpileup_command = "samtools mpileup -C $mpileup_C -m $mpileup_m -F $mpileup_F -d $max_depth -t DP,SP -g -o $mpileup_vcf -p -L $indel_cov_lim -f $reference_file $merged_bam";
    print STDERR "$mpileup_command\n";
    system($mpileup_command);
    assembly_common::add_tmp_file($mpileup_vcf);
