@@ -145,10 +145,17 @@ sub create_exons_tab($$)
       {
          my ($contig, $predictor, $region, $start, $end, @gff_fields) = split("\t", $gff_line);
 
-         if ($region eq "CDS")
+         if (defined($region) && $region eq "CDS")
          {
-            $contig =~ m/^.+\|SC\|(.+)$/;
-            my $chrom = $1;
+            my $chrom;
+            if ($contig =~ m/^.+\|SC\|(.+)$/)
+            {
+               $chrom = $1;
+            }
+            else
+            {
+               $chrom = $contig;
+            }
 
             print EXONS join("\t", $chrom, $start, $end) . "\n";
          }
