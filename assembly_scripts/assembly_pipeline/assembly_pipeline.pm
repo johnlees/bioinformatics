@@ -66,7 +66,7 @@ sub filter_contigs($$$$)
    while (my $contig = $fasta_in->next_seq())
    {
       my ($length, $coverage);
-      if ($contig->id =~ /^NODE_\d+_length_(\d+)_cov_(.+)_ID_\d+$/)
+      if ($contig->id =~ /^NODE_\d+_length_(\d+)_cov_(.+)/)
       {
          $length = $1;
          $coverage = $2;
