@@ -77,7 +77,7 @@ else
       $length = "match";
 
       # Ensure sorted by query, then match score
-      system("sort -k10,10n -k1,1nr $file_in > $tmp_sort");
+      system("sort -k10,10 -k1,1nr $file_in > $tmp_sort");
 
       $file_in = $tmp_sort;
       $clean = 1;
