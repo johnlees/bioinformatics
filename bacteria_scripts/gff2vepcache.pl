@@ -1,4 +1,4 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 
 # Converts a bacterial GFF and FASTA file to cache for use with VEP
 # An interface to the ensembl gtf2vep script, which requires some extra info in
@@ -29,6 +29,8 @@ sub add_trans_exon($$)
 
    if (!defined($new_attributes{transcript_id}))
    {
+      push(@order, "transcript_id");
+
       if(defined($new_attributes{locus_tag}))
       {
          $new_attributes{transcript_id} = $new_attributes{locus_tag};
@@ -42,6 +44,7 @@ sub add_trans_exon($$)
    # These are bacteria
    if(!defined($new_attributes{exon_number}))
    {
+      push(@order, "exon_number");
       $new_attributes{exon_number} = 1;
    }
 
