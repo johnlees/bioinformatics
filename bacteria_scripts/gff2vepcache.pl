@@ -65,7 +65,7 @@ if (!-e $gff || !-e $fasta)
 else
 {
    open(GFF, $gff) || die("Could not open gff file $gff: $!\n");
-   open(TMP, $tmp_gff) || die("Could not write to tmp gff file $tmp_gff: $!\n");
+   open(TMP, ">$tmp_gff") || die("Could not write to tmp gff file $tmp_gff: $!\n");
 
    # Parse gff fields. Add necessary description
    my $cds_nr = 0;
