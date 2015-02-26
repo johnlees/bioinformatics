@@ -1,8 +1,11 @@
-#!/usr/bin/env perl
+#!/usr/bin/env perl -w
 
 # Converts a bacterial GFF and FASTA file to cache for use with VEP
 # An interface to the ensembl gtf2vep script, which requires some extra info in
 # the GFF description fields to work
+#
+use strict;
+use warnings;
 
 my $gtf2vep_location = "~/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/gtf2vep.pl";
 my $tmp_gff = "tmp.gff";
@@ -46,11 +49,11 @@ sub add_trans_exon($$)
    my $attr_string;
    foreach my $name (@order)
    {
-      $att_string .= "$name=" . $new_attributes{$name} . ";";
+      $attr_string .= "$name=" . $new_attributes{$name} . ";";
    }
-   chop($att_string); # Remove final semi-colon
+   chop($attr_string); # Remove final semi-colon
 
-   return $att_string;
+   return $attr_string;
 }
 
 # Inputs
@@ -86,7 +89,7 @@ else
          {
             $cds_nr++;
             my $new_attributes = add_trans_exon(\@attributes, $cds_nr);
-            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, $new_attributes);
+            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, $new_attributes) . "\n";
          }
          else
          {
