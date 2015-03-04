@@ -33,11 +33,11 @@ sub add_trans_exon($$)
 
       if(defined($new_attributes{locus_tag}))
       {
-         $new_attributes{transcript_id} = $new_attributes{locus_tag};
+         $new_attributes{transcript_id} = "trans_" . $new_attributes{locus_tag};
       }
       else
       {
-         $new_attributes{transcript_id} = "cds.$cds_nr";
+         $new_attributes{transcript_id} = "trans_cds.$cds_nr";
       }
    }
 
@@ -104,7 +104,31 @@ else
          chomp $attribute;
          my @attributes = split(";", $attribute);
 
-         if ($feature eq "CDS")
+         if ($feature eq "gene")
+         {
+            # rename ID -> gene_id
+            my $gene_id;
+            $attribute = "";
+
+            foreach my $attr_pair (@attributes)
+            {
+               my ($key, $value) = split("=", $attr_pair);
+               if ($key eq "ID")
+               {
+                  $gene_id = $value;
+                  $attribute .= "gene_id=$gene_id;";
+               }
+               else
+               {
+                  $attribute .= "$attr_pair;";
+               }
+            }
+
+            # Need to print a transcript and an exon
+            print TMP join("\t", $seqname, $source, "transcript", $start, $end, $score, $strand, $frame, "gene_id=$gene_id;transcript_id=trans_$gene_id") . "\n";
+            print TMP join("\t", $seqname, $source, "exon", $start, $end, $score, $strand, $frame, "gene_id=$gene_id;transcript_id=trans_$gene_id;exon_number=1") . "\n";
+         }
+         elsif ($feature eq "CDS")
          {
             $cds_nr++;
             $attribute = add_trans_exon(\@attributes, $cds_nr);
