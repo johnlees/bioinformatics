@@ -8,7 +8,7 @@ use strict;
 use warnings;
 
 my $gtf2vep_location = "~/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/gtf2vep.pl";
-my $tmp_gff = "tmp.gff";
+my $tmp_gff = "tmp.gtf";
 my $species = "Streptoccocus pneumoniae R6";
 my $database_version = "25";
 
@@ -59,6 +59,22 @@ sub add_trans_exon($$)
    return $attr_string;
 }
 
+sub reformat_attribute($)
+{
+   my ($attribute_string) = @_;
+
+   my @attributes = split(";", $attribute_string);
+
+   my $new_string;
+   foreach my $attribute (@attributes)
+   {
+      my ($key, $value) = split("=", $attribute);
+      $new_string .= "$key \"$value\"; ";
+   }
+
+   return $new_string;
+}
+
 # Inputs
 my $gff = $ARGV[0];
 my $fasta = $ARGV[1];
@@ -91,13 +107,11 @@ else
          if ($feature eq "CDS")
          {
             $cds_nr++;
-            my $new_attributes = add_trans_exon(\@attributes, $cds_nr);
-            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, $new_attributes) . "\n";
+            $attribute = add_trans_exon(\@attributes, $cds_nr);
+            $source = "protein_coding";
          }
-         else
-         {
-            print TMP $gff_line;
-         }
+
+         print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
       }
    }
 
