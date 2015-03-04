@@ -31,9 +31,9 @@ sub add_trans_exon($$)
    {
       push(@order, "transcript_id");
 
-      if(defined($new_attributes{locus_tag}))
+      if(defined($new_attributes{ID}))
       {
-         $new_attributes{transcript_id} = "trans_" . $new_attributes{locus_tag};
+         $new_attributes{transcript_id} = "trans_" . $new_attributes{ID};
       }
       else
       {
@@ -129,7 +129,7 @@ else
             # Need to print a transcript and an exon
             print TMP join("\t", $seqname, $source, "transcript", $start, $end, $score, $strand, $frame,
                reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id")) . "\n";
-            print TMP join("\t", $seqname, $source, "exon", $start, $end, $score, $strand, $frame,
+            print TMP join("\t", $seqname, "protein_coding", "exon", $start, $end, $score, $strand, $frame,
                reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id;exon_number=1")) . "\n";
          }
          elsif ($feature eq "CDS")
