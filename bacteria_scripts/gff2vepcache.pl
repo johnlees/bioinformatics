@@ -124,18 +124,27 @@ else
                }
             }
 
+            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
+
             # Need to print a transcript and an exon
-            print TMP join("\t", $seqname, $source, "transcript", $start, $end, $score, $strand, $frame, "gene_id=$gene_id;transcript_id=trans_$gene_id") . "\n";
-            print TMP join("\t", $seqname, $source, "exon", $start, $end, $score, $strand, $frame, "gene_id=$gene_id;transcript_id=trans_$gene_id;exon_number=1") . "\n";
+            print TMP join("\t", $seqname, $source, "transcript", $start, $end, $score, $strand, $frame,
+               reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id")) . "\n";
+            print TMP join("\t", $seqname, $source, "exon", $start, $end, $score, $strand, $frame,
+               reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id;exon_number=1")) . "\n";
          }
          elsif ($feature eq "CDS")
          {
             $cds_nr++;
             $attribute = add_trans_exon(\@attributes, $cds_nr);
             $source = "protein_coding";
+
+            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
+         }
+         else
+         {
+            print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
          }
 
-         print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
       }
    }
 
