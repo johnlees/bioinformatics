@@ -17,7 +17,7 @@ my $usage = "perl gff2vepcache.pl genes.gff sequence.fa";
 # Add to necessary attribute fields
 sub add_trans_exon($$)
 {
-   my ($attributes, $cds_nr) = @_;
+   my ($attributes, $gene_id) = @_;
 
    my (%new_attributes, @order);
    foreach my $attribute (@$attributes)
@@ -30,15 +30,7 @@ sub add_trans_exon($$)
    if (!defined($new_attributes{transcript_id}))
    {
       push(@order, "transcript_id");
-
-      if(defined($new_attributes{ID}))
-      {
-         $new_attributes{transcript_id} = "trans_" . $new_attributes{ID};
-      }
-      else
-      {
-         $new_attributes{transcript_id} = "trans_cds.$cds_nr";
-      }
+      $new_attributes{transcript_id} = "trans_" . $gene_id;
    }
 
    # These are bacteria
@@ -90,9 +82,12 @@ else
    open(TMP, ">$tmp_gff") || die("Could not write to tmp gff file $tmp_gff: $!\n");
 
    # Parse gff fields. Add necessary description
-   my $cds_nr = 0;
    while (my $gff_line = <GFF>)
    {
+      # Persist between rows
+      my ($gene_id, $gene_last);
+      my $cds_nr = 0;
+
       if ($gff_line =~ /^##/)
       {
          print TMP $gff_line;
@@ -106,8 +101,9 @@ else
 
          if ($feature eq "gene")
          {
+            $gene_last = 1;
+
             # rename ID -> gene_id
-            my $gene_id;
             $attribute = "";
 
             foreach my $attr_pair (@attributes)
@@ -135,13 +131,25 @@ else
          elsif ($feature eq "CDS")
          {
             $cds_nr++;
-            $attribute = add_trans_exon(\@attributes, $cds_nr);
+            if ($gene_last)
+            {
+               $attribute = add_trans_exon(\@attributes, $gene_id);
+            }
+            else
+            {
+               $attribute = add_trans_exon(\@attributes, $cds_nr);
+            }
+
             $source = "protein_coding";
 
             print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
+
+            $gene_last = 0;
          }
          else
          {
+            $gene_last = 0;
+
             print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
          }
 
