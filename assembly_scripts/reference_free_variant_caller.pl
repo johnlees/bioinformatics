@@ -101,6 +101,7 @@ my $bcftools_stderr_file = "bcftools.err";
 my $filter_lines = <<'FILTERS';
 ##FILTER=<ID=PF_FAIL_ERROR,Description="Failed population filter">
 ##FILTER=<ID=PF_FAIL_REPEAT,Description="Identified as a repeat by population filter">
+##FILTER=<ID=DUP_ALLELE,Description="Duplicate allele">
 FILTERS
 
 my $exons_file = "exons.tab";
