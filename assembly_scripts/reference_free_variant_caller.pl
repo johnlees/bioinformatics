@@ -345,6 +345,35 @@ sub create_cortex_index($$)
    return($index_name);
 }
 
+# Remove position < 1 variants from cortex output
+sub remove_bad_vars($)
+{
+   my ($vcf_file) = @_;
+
+   my $tmp_file = "ctx_tmp.vcf";
+   assembly_common::add_tmp_file($tmp_file);
+
+   open(VCF, "$vcf_file") || die("Couldn't open $vcf_file\n");
+   open(TMP, ">$tmp_file") || die("Couldn't write to $tmp_file\n");
+
+   while (my $vcf_line = <VCF>)
+   {
+      chomp $vcf_line;
+      my ($chr, $pos, @fields) = split("\t", $vcf_line);
+
+      if ($chr !~ "^#" && $pos < 1)
+      {
+         next;
+      }
+      else
+      {
+         print TMP "$vcf_line\n";
+      }
+   }
+
+   return($tmp_file);
+}
+
 # Using sga: Filter forward and reverse reads, then index with ropebwt
 sub sga_filter_index($$$)
 {
@@ -495,6 +524,9 @@ else
       my $output_vcf = "$cwd/$out_dir/vcfs/$output_prefix" . "_wk_flow_J_RefCO_FINALcombined_BC_calls_at_all_k.decomp.vcf";
       print STDERR "Cortex output vcf is: $output_vcf\n\n";
       print STDERR "Fixing and annotating vcf\n";
+
+      # Manually remove variants with negative/zero positions
+      $output_vcf = remove_bad_vars($output_vcf);
 
       # Reheader vcf with bcftools as pop filter FILTER fields not included (bug in cortex)
       system($bcftools_location . " view -h $output_vcf > vcf_header.tmp 2> $bcftools_stderr_file");
