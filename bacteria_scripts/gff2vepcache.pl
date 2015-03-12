@@ -9,15 +9,14 @@ use warnings;
 
 my $gtf2vep_location = "~/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/gtf2vep.pl";
 my $tmp_gff = "tmp.gtf";
-my $species = "Streptoccocus pneumoniae R6";
 my $database_version = "25";
 
-my $usage = "perl gff2vepcache.pl genes.gff sequence.fa";
+my $usage = "perl gff2vepcache.pl species_name genes.gff sequence.fa";
 
 # Add to necessary attribute fields
-sub add_trans_exon($$)
+sub add_trans_exon($$$)
 {
-   my ($attributes, $gene_id) = @_;
+   my ($attributes, $gene_id, $trans_id) = @_;
 
    my (%new_attributes, @order);
    foreach my $attribute (@$attributes)
@@ -30,7 +29,7 @@ sub add_trans_exon($$)
    if (!defined($new_attributes{transcript_id}))
    {
       push(@order, "transcript_id");
-      $new_attributes{transcript_id} = "trans_" . $gene_id;
+      $new_attributes{transcript_id} = $trans_id;
    }
 
    # These are bacteria
@@ -68,8 +67,9 @@ sub reformat_attribute($)
 }
 
 # Inputs
-my $gff = $ARGV[0];
-my $fasta = $ARGV[1];
+my $species = $ARGV[0];
+my $gff = $ARGV[1];
+my $fasta = $ARGV[2];
 
 if (!-e $gff || !-e $fasta)
 {
@@ -82,8 +82,9 @@ else
    open(TMP, ">$tmp_gff") || die("Could not write to tmp gff file $tmp_gff: $!\n");
 
    # Persist between rows
-   my ($gene_id, $gene_last);
+   my ($gene_id, $trans_id, $gene_last, $copy_nr, $last_trans);
    my $cds_nr = 0;
+   $last_trans = "";
 
    # Parse gff fields. Add necessary description
    while (my $gff_line = <GFF>)
@@ -113,6 +114,24 @@ else
                {
                   $gene_id = $value;
                   $attribute .= "gene_id=$gene_id;";
+                  $trans_id = "trans_$gene_id";
+               }
+               elsif ($key eq "gene")
+               {
+                  # Same name as last gene?
+                  if ($last_trans eq $value)
+                  {
+                     $copy_nr++;
+                     $trans_id = "$value\_$copy_nr";
+                     $attribute .= "gene=$trans_id;";
+                  }
+                  else
+                  {
+                     $copy_nr = 1;
+                     $trans_id = $value;
+                     $last_trans = $trans_id;
+                     $attribute .= "$attr_pair;";
+                  }
                }
                else
                {
@@ -124,20 +143,20 @@ else
 
             # Need to print a transcript and an exon
             print TMP join("\t", $seqname, $source, "transcript", $start, $end, $score, $strand, $frame,
-               reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id")) . "\n";
+               reformat_attribute("gene_id=$gene_id;transcript_id=$trans_id")) . "\n";
             print TMP join("\t", $seqname, "protein_coding", "exon", $start, $end, $score, $strand, $frame,
-               reformat_attribute("gene_id=$gene_id;transcript_id=trans_$gene_id;exon_number=1")) . "\n";
+               reformat_attribute("gene_id=$gene_id;transcript_id=$trans_id;exon_number=1")) . "\n";
          }
          elsif ($feature eq "CDS")
          {
             $cds_nr++;
             if ($gene_last)
             {
-               $attribute = add_trans_exon(\@attributes, $gene_id);
+               $attribute = add_trans_exon(\@attributes, $gene_id, $trans_id);
             }
             else
             {
-               $attribute = add_trans_exon(\@attributes, $cds_nr);
+               $attribute = add_trans_exon(\@attributes, $cds_nr, "trans_$cds_nr");
             }
 
             $source = "protein_coding";
