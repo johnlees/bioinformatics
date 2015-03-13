@@ -121,18 +121,11 @@ else
                   my $repeat = 0;
                   foreach my $gene_name (@genes)
                   {
-                     if (!defined($copy{$gene_name}))
-                     {
-                        $copy{$gene_name} = 1;
-                     }
-                     else
-                     {
-                        $copy{$gene_name}++;
-                     }
+                     $copy{$gene_name}++;
 
-                     if ($key eq $gene_name)
+                     if ($value eq $gene_name)
                      {
-                        $trans_id = "$gene_name\_$copy{$gene_name}";
+                        $trans_id = "$gene_name\_" . ($copy{$gene_name} - 1);
                         $repeat = 1;
                         last;
                      }
@@ -196,7 +189,7 @@ else
    print STDERR "Running gtf2vep\n";
    system("perl $gtf2vep_location -i $tmp_gff -f $fasta -s $species -d $database_version");
 
-   unlink $tmp_gff;
+   #unlink $tmp_gff;
 }
 
 exit(0);
