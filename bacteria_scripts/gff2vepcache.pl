@@ -82,9 +82,8 @@ else
    open(TMP, ">$tmp_gff") || die("Could not write to tmp gff file $tmp_gff: $!\n");
 
    # Persist between rows
-   my ($gene_id, $trans_id, $gene_last, $copy_nr, $last_trans);
+   my ($gene_id, $trans_id, $gene_last, %copy, @genes);
    my $cds_nr = 0;
-   $last_trans = "";
 
    # Parse gff fields. Add necessary description
    while (my $gff_line = <GFF>)
@@ -119,24 +118,39 @@ else
                elsif ($key eq "gene")
                {
                   # Same name as last gene?
-                  if ($last_trans eq $value)
+                  my $repeat = 0;
+                  foreach my $gene_name (@genes)
                   {
-                     $copy_nr++;
-                     $trans_id = "$value\_$copy_nr";
-                     $attribute .= "gene=$trans_id;";
+                     if (!defined($copy{$gene_name}))
+                     {
+                        $copy{$gene_name} = 1;
+                     }
+                     else
+                     {
+                        $copy{$gene_name}++;
+                     }
+
+                     if ($key eq $gene_name)
+                     {
+                        $trans_id = "$gene_name\_$copy{$gene_name}";
+                        $repeat = 1;
+                        last;
+                     }
                   }
-                  else
+
+                  if (!$repeat)
                   {
-                     $copy_nr = 1;
                      $trans_id = $value;
-                     $last_trans = $trans_id;
-                     $attribute .= "$attr_pair;";
+                     push (@genes, $value);
                   }
+
+                  $attribute .= "gene=$trans_id;";
                }
                else
                {
                   $attribute .= "$attr_pair;";
                }
+
             }
 
             print TMP join("\t", $seqname, $source, $feature, $start, $end, $score, $strand, $frame, reformat_attribute($attribute)) . "\n";
