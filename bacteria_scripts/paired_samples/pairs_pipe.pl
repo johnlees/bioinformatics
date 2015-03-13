@@ -30,11 +30,12 @@ of samples
    --output          Output directory. Default ./
    --dirty           Leave all logs and intermediate output in place
                      (~8Gb per pair)
-   --mem             String for lsf memory, comma separated cortex then
+   --mem             String for lsf memory, comma separated, cortex then
                      mapping. Default 2000,4000
    --cores           String for number of cores required for each job.
                      Comma separated, cortex then mapping.
                      Default 1,1
+   --no_annotate     Don't annotate vcfs (for problem cases)
 
    --cortex          Run cortex step only
    --map             Run map step only
@@ -70,11 +71,12 @@ sub get_fastq($$)
 #* Main                                                               *#
 #**********************************************************************#
 my ($lane_file, $assembly_directory, $output_directory, $dirty, $mem_string, $no_symlinks,
-    ,$core_string,$cortex_only, $map_only, $help);
+    ,$core_string, $no_annotate, $cortex_only, $map_only, $help);
 GetOptions("lanes=s" => \$lane_file,
            "output|o=s" => \$output_directory,
            "assembly_dir=s" => \$assembly_directory,
            "dirty" => \$dirty,
+           "no_annotate" => \$no_annotate,
            "cortex" => \$cortex_only,
            "map" => \$map_only,
            "mem=s" => \$mem_string,
@@ -151,7 +153,13 @@ else
          chdir "cortex";
 
          my $bsub_cortex = "bsub -o ../logs/cortex.%J.o -e ../logs/cortex.%J.e -R \"select[mem>$cortex_mem] rusage[mem=$cortex_mem]\" -M$cortex_mem -n$cortex_cores -R \"span[hosts=1]\"";
-         my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_location -g $annotation_location --separate-correct -r ../reads.txt -o $sample";
+         my $cortex_command = "~/bioinformatics/assembly_scripts/reference_free_variant_caller.pl --cortex -a $assembly_location";
+
+         if (!$no_annotate)
+         {
+            $cortex_command .= " -g $annotation_location";
+         }
+         $cortex_command .= " --separate-correct -r ../reads.txt -o $sample";
          if ($dirty)
          {
             $cortex_command .= " --dirty";
@@ -177,7 +185,12 @@ else
          chdir "mapping";
 
          my $bsub_mapping = "bsub -o ../logs/mapping.%J.o -e ../logs/mapping.%J.e -R \"select[mem>$map_memory] rusage[mem=$map_memory]\" -M$map_memory -n$map_cores -R \"span[hosts=1]\"";
-         my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a $assembly_location -g $annotation_location -r ../reads.txt -o $sample -p 1e-6 -t $map_cores --linear";
+         my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -a $assembly_location";
+         if (!$no_annotate)
+         {
+            $map_command .= " -g $annotation_location";
+         }
+         $map_command .= " -r ../reads.txt -o $sample -p 1e-6 -t $map_cores --linear";
          if ($dirty)
          {
             $map_command .= " --dirty";
