@@ -105,8 +105,9 @@ sub transfer_annotation($$)
    # Also annotate allele counts at the same time
    # bcftools v1.1: AN, AC already calculated. Plugins available from bcftools
    # plugin
-   my $bcftools_command = "$bcftools annotate -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file -O z $vcf_file 2> $stderr_file";
+   my $bcftools_command = "$bcftools annotate -a $tmp_annotation.gz -h $annotation_header_file -c CHROM,FROM,TO,REGION_TYPE,ANNOT_ID,GENE -o $vcf_file.annot.tmp -O z $vcf_file 2> $stderr_file";
    system($bcftools_command);
+   rename "$vcf_file.annot.tmp", $vcf_file;
 
    # Need to refresh index
    system("$bcftools index -f $vcf_file 2>> $stderr_file");
