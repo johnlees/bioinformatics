@@ -418,11 +418,11 @@ if (defined($help))
 {
    print $help_message;
 }
-elsif (!defined($assembly_file) || !defined($annotation_file) || !defined($read_file) || !defined($output_prefix))
+elsif (!defined($assembly_file) || !defined($read_file) || !defined($output_prefix))
 {
    print STDERR $usage_message;
 }
-elsif (!-e $assembly_file || !-e $annotation_file || !-e $read_file)
+elsif (!-e $assembly_file || (defined($annotation_file) && !-e $annotation_file) || !-e $read_file)
 {
    print STDERR "One or more specified input files do not exist\n";
    print STDERR $usage_message;
