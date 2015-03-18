@@ -3,13 +3,41 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
+
 my %gene_counts;
-my $mode = $ARGV[0];
-my $pairs_file = $ARGV[1];
+
+my $usage_message = <<USAGE;
+Usage: ./summarise_output.pl <--genes|--orfs> --assemblies > result.txt 2> failed.txt
+
+Gather the output of pairs_pipe.pl
+
+   --assemblies      Sample, lane 1, lane 2. Same file as input to pairs_pipe.pl
+
+   Mode options
+   <none>            Number of mutations by sample
+   --genes           Number of mutations by gene (count each sample once)
+   --orfs            Names of all genes, to investigate unannotated proteins
+
+   -h, --help        Shows this help.
+
+USAGE
+
+my ($pairs_file, $gene_mode, $orfs, $help);
+GetOptions("assemblies=s" => \$pairs_file,
+           "genes" => \$gene_mode,
+           "orfs" => \$orfs,
+           "help|h" => \$help) || die("$!\n$usage_message");
+
+if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($orfs)))
+{
+   print STDERR $usage_message;
+   exit 0;
+}
 
 open(PAIRS, $pairs_file) || die("Could not open $pairs_file\n");
 
-unless ($mode eq "genes")
+if (!$gene_mode && !$orfs)
 {
    print join("\t", "Sample", "SNPs", "INDELs", "Total", "Genes") . "\n";
 }
@@ -40,15 +68,26 @@ while (my $line_in = <PAIRS>)
          my $genes = `bcftools query -f '%GENE\n' $vcf_name`;
          my @gene_list = split("\n", $genes);
 
+         my ($orfs, @orf_list);
+         if ($orfs)
+         {
+            my $orfs = `bcftools query -f '%ANNOT_ID\n' $vcf_name`;
+            my @orf_list = split("\n", $orfs);
+         }
+
          for (my $i = 0; $i < scalar(@gene_list); $i++)
          {
             if ($gene_list[$i] =~ /^(.+)_(\d+)$/)
             {
                $gene_list[$i] = $1;
             }
+            elsif ($orfs && $gene_list[$i] eq "1")
+            {
+               $gene_list[$i] = "ORF_" . $orf_list[$i];
+            }
          }
 
-         unless ($mode eq "genes")
+         if (!$gene_mode && !$orfs)
          {
             print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
          }
@@ -79,7 +118,7 @@ while (my $line_in = <PAIRS>)
 
 close PAIRS;
 
-if ($mode eq "genes")
+if ($gene_mode || $orfs)
 {
    print join("\t", "Gene name", "Samples with variation") . "\n";
 
