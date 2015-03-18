@@ -71,8 +71,8 @@ while (my $line_in = <PAIRS>)
          my ($orfs, @orf_list);
          if ($orf_mode)
          {
-            my $orfs = `bcftools query -f '%ANNOT_ID\n' $vcf_name`;
-            my @orf_list = split("\n", $orfs);
+            $orfs = `bcftools query -f '%ANNOT_ID\n' $vcf_name`;
+            @orf_list = split("\n", $orfs);
          }
 
          for (my $i = 0; $i < scalar(@gene_list); $i++)
