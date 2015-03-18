@@ -12,7 +12,7 @@ Usage: ./summarise_output.pl <--genes|--orfs> --assemblies > result.txt 2> faile
 
 Gather the output of pairs_pipe.pl
 
-   --assemblies      Sample, lane 1, lane 2. Same file as input to pairs_pipe.pl
+   --samples         Sample, lane 1, lane 2. Same file as input to pairs_pipe.pl
 
    Mode options
    <none>            Number of mutations by sample
@@ -23,13 +23,13 @@ Gather the output of pairs_pipe.pl
 
 USAGE
 
-my ($pairs_file, $gene_mode, $orfs, $help);
-GetOptions("assemblies=s" => \$pairs_file,
+my ($pairs_file, $gene_mode, $orf_mode, $help);
+GetOptions("samples=s" => \$pairs_file,
            "genes" => \$gene_mode,
-           "orfs" => \$orfs,
+           "orfs" => \$orf_mode,
            "help|h" => \$help) || die("$!\n$usage_message");
 
-if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($orfs)))
+if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($orf_mode)))
 {
    print STDERR $usage_message;
    exit 0;
@@ -37,7 +37,7 @@ if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($
 
 open(PAIRS, $pairs_file) || die("Could not open $pairs_file\n");
 
-if (!$gene_mode && !$orfs)
+if (!$gene_mode && !$orf_mode)
 {
    print join("\t", "Sample", "SNPs", "INDELs", "Total", "Genes") . "\n";
 }
@@ -69,7 +69,7 @@ while (my $line_in = <PAIRS>)
          my @gene_list = split("\n", $genes);
 
          my ($orfs, @orf_list);
-         if ($orfs)
+         if ($orf_mode)
          {
             my $orfs = `bcftools query -f '%ANNOT_ID\n' $vcf_name`;
             my @orf_list = split("\n", $orfs);
@@ -81,13 +81,13 @@ while (my $line_in = <PAIRS>)
             {
                $gene_list[$i] = $1;
             }
-            elsif ($orfs && $gene_list[$i] eq "1")
+            elsif ($orf_mode && $gene_list[$i] eq "1")
             {
                $gene_list[$i] = "ORF_" . $orf_list[$i];
             }
          }
 
-         if (!$gene_mode && !$orfs)
+         if (!$gene_mode && !$orf_mode)
          {
             print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
          }
@@ -118,7 +118,7 @@ while (my $line_in = <PAIRS>)
 
 close PAIRS;
 
-if ($gene_mode || $orfs)
+if ($gene_mode || $orf_mode)
 {
    print join("\t", "Gene name", "Samples with variation") . "\n";
 
