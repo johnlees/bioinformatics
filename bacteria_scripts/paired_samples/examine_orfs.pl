@@ -36,6 +36,7 @@ while (my $orf_line = <ORFS>)
          if ($orf eq $sequence->display_id())
          {
             $sequence_out->write_seq($sequence);
+            last;
          }
       }
    }
