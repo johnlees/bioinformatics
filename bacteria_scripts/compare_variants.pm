@@ -264,9 +264,9 @@ sub blastn_ref($$)
 
 # Extracts windows of a specified size around a specified list of variants,
 # creates a multi-fasta file of them
-sub variant_windows($$$$)
+sub variant_windows($$$$;$)
 {
-   my ($window_size, $variant_list, $sequence_file, $output_file) = @_;
+   my ($window_size, $variant_list, $sequence_file, $output_file, $before) = @_;
 
    # Input and output multifasta
    my $sequence_in = Bio::SeqIO->new( -file   => "<$sequence_file",
@@ -310,7 +310,15 @@ sub variant_windows($$$$)
             }
 
             # Extract the window, then write it to the output
-            my $window = extract_bp_window($sequence, $window_size, $position_start, $position_end);
+            my $window;
+            if ($before)
+            {
+               $window = extract_bp_before($sequence, $window_size, $position_start);
+            }
+            else
+            {
+               $window = extract_bp_window($sequence, $window_size, $position_start, $position_end);
+            }
 
             $window->display_id($variant);
             $sequence_out->write_seq($window);
@@ -373,6 +381,26 @@ sub extract_bp_window($$$;$)
    return($window);
 }
 
+# Extracts sequence of a window size around a position, returning a Bio::Seq
+# object of this
+sub extract_bp_before($$$)
+{
+   my ($sequence, $seq_size, $position_start) = @_;
+
+   my $context;
+   if ($sequence->length() < $seq_size || $position_start < ($seq_size - 1) )
+   {
+      print STDERR "Cannot extract $seq_size bp before $position_start as sequence too small\n";
+   }
+   else
+   {
+      my $context_sequence = $sequence->subseq($position_start-$seq_size, $position_start);
+      $context = Bio::Seq->new( -seq => $context_sequence);
+   }
+
+   return($context);
+}
+
 # Takes a list of paired vcfs and reference fastas and creates a multifasta of
 # windows around the variants
 sub create_blastn_input($$$;$$)
@@ -396,7 +424,15 @@ sub extract_vcf_variants($;$$)
    my ($vcf_in, $filter, $type) = @_;
 
    # Tab delimited contig, position list of all variants in vcf
-   my $bcftools_command = "$bcftools_location view -f $filter -v $type $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' -";
+   my $bcftools_command;
+   if (defined($type) && defined($filter))
+   {
+      $bcftools_command = "$bcftools_location view -f $filter -v $type $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' -";
+   }
+   else
+   {
+      $bcftools_command = "$bcftools_location view $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' -";
+   }
    my $bcf_return = `$bcftools_command`;
 
    # Create a hash of variant details

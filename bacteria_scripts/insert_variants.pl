@@ -68,10 +68,9 @@ else
 {
    assembly_common::standardise_contig_names($map_ref, $tmp_ref);
 
-   my @vcfs = ($vcf_in);
-   my @refs = ($tmp_ref);
-   compare_variants::create_blastn_input(\@vcfs, \@refs, $blast_prefix);
-   my $blast_output = "$blast_prefix.1.fa";
+   my $blast_output = "$blast_prefix.fa";
+   my $variant_lists = compare_variants::extract_vcf_variants($vcf_in);
+   compare_variants::variant_windows(100, $variant_lists, $tmp_ref, $blast_output, 1);
 
    my $blast_scores = compare_variants::blastn_ref($blast_output, $new_ref);
 
