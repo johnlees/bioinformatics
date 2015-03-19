@@ -236,6 +236,32 @@ sub blastn_pairwise($$)
    return(\%blast_scores);
 }
 
+# blastn of all v ref. Returns reference to hash of variant and new position
+sub blastn_ref($$)
+{
+   my ($query_file, $ref_file) = @_;
+
+   my %blast_scores;
+
+   # blastn of all sequences in query with all in subject. Output is tab
+   # sepearated query_id, subject_id, e_value and score for each pairwise
+   # comparison
+   my $blastn_command = "$blastn_location -subject $ref_file -query $query_file -outfmt \"6 qseqid sstart send evalue score\"";
+   my $blast_result = `$blastn_command`;
+
+   # Return data in a hash
+   foreach my $pair (split("\n", $blast_result))
+   {
+      my ($q_id, $start, $end, $evalue) = split("\t", $pair);
+
+      $blast_scores{$q_id}{start} = $start;
+      $blast_scores{$q_id}{end} = $end;
+      $blast_scores{$q_id}{evalue} = $evalue;
+   }
+
+   return(\%blast_scores);
+}
+
 # Extracts windows of a specified size around a specified list of variants,
 # creates a multi-fasta file of them
 sub variant_windows($$$$)
