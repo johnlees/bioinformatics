@@ -38,6 +38,8 @@ USAGE
 my $tmp_ref = "reference_renamed.fa";
 my $blast_prefix = "blast_windows";
 
+my $new_chrom = "AE007317";
+
 #****************************************************************************************#
 #* Functions                                                                            *#
 #****************************************************************************************#
@@ -74,9 +76,32 @@ else
 
    my $blast_scores = compare_variants::blastn_ref($blast_output, $new_ref);
 
+   #copy header then print:
+   #vcf lines, tab separated
+   #CHROM POS ID REF ALT QUAL FILTER INFO FORMAT sample
+   #AE007317 start-1 . A C . PASS . GT 1
+   #
+   #so ends up as its own vcf
+   #
+   system ("bcftools view -h $vcf_in");
+
    foreach my $q_id (sort keys %$blast_scores)
    {
-      print join("\t", $q_id, $$blast_scores{$q_id}{start}, $$blast_scores{$q_id}{end} . "\n");
+      my ($chrom, $pos, $ref, $alt) = split(",", $q_id);
+
+      if ($$blast_scores{$q_id}{start} > $$blast_scores{$q_id}{end})
+      {
+         $ref = compare_variants::flip_strand($ref, "reverse");
+         $alt = compare_variants::flip_strand($alt, "reverse");
+
+         $pos = $$blast_scores{$q_id}{end} - (length($alt) - length($ref) + 1) - 1;
+      }
+      else
+      {
+         $pos = $$blast_scores{$q_id}{start} - 1;
+      }
+
+      print join("\t", $new_chrom, $pos, ".", $ref, $alt, ".", "PASS", ".", "GT", "1\n");
    }
 
    unless($dirty)
