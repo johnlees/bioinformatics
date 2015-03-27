@@ -84,6 +84,8 @@ else
    #so ends up as its own vcf
    #
    system ("bcftools view -h $vcf_in");
+   my $num_samples = `bcftools query -f '[%SAMPLE\t]\n' $vcf_in | head -1 | wc -w`;
+   chomp $num_samples;
 
    foreach my $q_id (sort keys %$blast_scores)
    {
@@ -94,14 +96,14 @@ else
          $ref = compare_variants::flip_strand($ref, "reverse");
          $alt = compare_variants::flip_strand($alt, "reverse");
 
-         $pos = $$blast_scores{$q_id}{end} - (length($alt) - length($ref) + 1) - 1;
+         $pos = $$blast_scores{$q_id}{end} - (abs(length($alt) - length($ref)) + 1) - 1;
       }
       else
       {
          $pos = $$blast_scores{$q_id}{start} - 1;
       }
 
-      print join("\t", $new_chrom, $pos, ".", $ref, $alt, ".", "PASS", ".", "GT", "1\n");
+      print join("\t", $new_chrom, $pos, ".", $ref, $alt, ".", "PASS", ".", "GT", "1\t"x$num_samples . "\n");
    }
 
    unless($dirty)
