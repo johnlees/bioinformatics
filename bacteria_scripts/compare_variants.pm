@@ -280,7 +280,7 @@ sub variant_windows($$$$;$)
    {
       foreach my $variant (@$variant_list)
       {
-         my ($contig, $position, $ref, $alt) = split(",", $variant);
+         my ($contig, $position, $ref, $alt, @samples) = split(",", $variant);
 
          if ($contig eq $sequence->display_id())
          {
@@ -340,7 +340,7 @@ sub extract_bp_window($$$;$)
 {
    my ($sequence, $window_size, $position_start, $position_end) = @_;
 
-   # Window size must be evn, as we will extract a region symmetric around the
+   # Window size must be even, as we will extract a region symmetric around the
    # variant not including it
    if ($window_size % 2 != 0)
    {
@@ -431,7 +431,7 @@ sub extract_vcf_variants($;$$)
    }
    else
    {
-      $bcftools_command = "$bcftools_location view $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT\n' -";
+      $bcftools_command = "$bcftools_location view $vcf_in | $bcftools_location query -f '%CHROM\t%POS\t%REF\t%ALT[\t%TGT]\n' -";
    }
    my $bcf_return = `$bcftools_command`;
 

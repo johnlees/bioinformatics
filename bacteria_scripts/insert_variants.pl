@@ -76,6 +76,10 @@ else
 
    my $blast_scores = compare_variants::blastn_ref($blast_output, $new_ref);
 
+   my $sequence_in = Bio::SeqIO->new( -file   => "<$new_ref",
+                                      -format => "fasta" ) || die ($!);
+   my $new_ref_sequence = $sequence_in->next_seq();
+
    #copy header then print:
    #vcf lines, tab separated
    #CHROM POS ID REF ALT QUAL FILTER INFO FORMAT sample
@@ -84,26 +88,68 @@ else
    #so ends up as its own vcf
    #
    system ("bcftools view -h $vcf_in");
-   my $num_samples = `bcftools query -f '[%SAMPLE\t]\n' $vcf_in | head -1 | wc -w`;
-   chomp $num_samples;
 
    foreach my $q_id (sort keys %$blast_scores)
    {
-      my ($chrom, $pos, $ref, $alt) = split(",", $q_id);
+      my ($chrom, $pos, $ref, $alt, @samples) = split(",", $q_id);
+
+      my $new_ref = $ref;
+      my $new_alt = $alt;
 
       if ($$blast_scores{$q_id}{start} > $$blast_scores{$q_id}{end})
       {
-         $ref = compare_variants::flip_strand($ref, "reverse");
-         $alt = compare_variants::flip_strand($alt, "reverse");
+         $new_ref = compare_variants::flip_strand($ref, "reverse");
+         $new_alt = compare_variants::flip_strand($alt, "reverse");
 
-         $pos = $$blast_scores{$q_id}{end} - (abs(length($alt) - length($ref)) + 1) - 1;
+         if (length($new_alt) == 1 && length($new_ref) == 1)
+         {
+            $pos = $$blast_scores{$q_id}{end} - 1;
+         }
+         # indels include an extra base
+         else
+         {
+            $pos = $$blast_scores{$q_id}{end} - (abs(length($new_alt) - length($new_ref)) + 1) - 1;
+         }
       }
       else
       {
          $pos = $$blast_scores{$q_id}{start} - 1;
       }
 
-      print join("\t", $new_chrom, $pos, ".", $ref, $alt, ".", "PASS", ".", "GT", "1\t"x$num_samples . "\n");
+      # Check which is really the ref
+      my $flipped;
+      if ($new_ref_sequence->subseq($pos, $pos + length($new_ref) - 1) =~ /^$ref$/i)
+      {
+         $flipped = 0;
+      }
+      elsif ($new_ref_sequence->subseq($pos, $pos + length($new_alt) - 1) =~ /^$alt$/i)
+      {
+         $flipped = 1;
+
+         my $tmp_store = $new_alt;
+         $new_alt = $new_ref;
+         $new_ref = $tmp_store;
+      }
+      else
+      {
+         print STDERR "Could not map $q_id\n";
+         next;
+      }
+
+      my $sample_str = "";
+      foreach my $sample_gt (@samples)
+      {
+         if ((!$flipped && $sample_gt =~ /^$ref(\/|$)/i) || ($flipped && $sample_gt =~ /^$alt(\/|$)/i))
+         {
+            $sample_str .= "0\t";
+         }
+         else
+         {
+            $sample_str .= "1\t";
+         }
+      }
+
+      print join("\t", $new_chrom, $pos, ".", $new_ref, $new_alt, ".", "PASS", ".", "GT", $sample_str . "\n");
    }
 
    unless($dirty)
