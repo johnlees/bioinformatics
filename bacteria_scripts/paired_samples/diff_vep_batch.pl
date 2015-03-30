@@ -46,7 +46,7 @@ while (my $sample = <SAMPLES>)
    }
 
    # Run vep
-   system("perl /nfs/users/nfs_j/jl11/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/variant_effect_predictor.pl -i diffs.vcf --cache --species Streptococcus_pneumoniae_R6 --cache_version 25 --offline --output_file diff_effects --coding_only");
+   system("perl /nfs/users/nfs_j/jl11/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/variant_effect_predictor.pl -i diffs.vcf --cache --species Streptococcus_pneumoniae_R6 --cache_version 25 --offline --output_file diff_effects --coding_only 1>&2");
 
    # Summarise output
    open(VEP, "diff_effects") || die("Couldn't open vep output for sample $sample\n");
@@ -58,7 +58,7 @@ while (my $sample = <SAMPLES>)
       {
          my ($var, $loc, $allele, $gene, $feature, $feature_type, $consequence, $cDNA_position, $CDS_position, $Protein_position, $Amino_acids, $Codons, $Existing_variation, $Extra) = split("\t", $line_in);
 
-         print join("\t", $sample, $gene, $consequence, $vars{$loc}) . "\n";
+         print join("\t", $sample, $feature, $consequence, $vars{$loc}) . "\n";
       }
    }
 
