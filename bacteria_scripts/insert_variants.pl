@@ -118,11 +118,11 @@ else
 
       # Check which is really the ref
       my $flipped;
-      if ($new_ref_sequence->subseq($pos, $pos + length($new_ref) - 1) =~ /^$ref$/i)
+      if ($new_ref_sequence->subseq($pos, $pos + length($new_ref) - 1) =~ /^$new_ref$/i)
       {
          $flipped = 0;
       }
-      elsif ($new_ref_sequence->subseq($pos, $pos + length($new_alt) - 1) =~ /^$alt$/i)
+      elsif ($new_ref_sequence->subseq($pos, $pos + length($new_alt) - 1) =~ /^$new_alt$/i)
       {
          $flipped = 1;
 
