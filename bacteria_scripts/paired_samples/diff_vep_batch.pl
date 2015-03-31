@@ -74,7 +74,7 @@ while (my $sample = <SAMPLES>)
                }
                else
                {
-                  my $ins_pos = $2+1;
+                  my $ins_pos = $2-1;
 
                   if (defined ($vars{"$1:$ins_pos"}))
                   {
