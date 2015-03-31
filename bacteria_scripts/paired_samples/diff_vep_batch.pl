@@ -53,21 +53,22 @@ while (my $sample = <SAMPLES>)
    if (scalar(keys %vars) != 0)
    {
       system("perl /nfs/users/nfs_j/jl11/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/variant_effect_predictor.pl -i diffs.vcf --cache --species Streptococcus_pneumoniae_R6 --cache_version 25 --offline --output_file diff_effects --coding_only --force_overwrite &> vep_diff.log");
-   }
 
-   # Summarise output
-   open(VEP, "diff_effects") || die("Couldn't open vep output for sample $sample\n");
-   while (my $line_in = <VEP>)
-   {
-      chomp $line_in;
-
-      unless ($line_in =~ /^#/)
+      # Summarise output
+      open(VEP, "diff_effects") || die("Couldn't open vep output for sample $sample\n");
+      while (my $line_in = <VEP>)
       {
-         my ($var, $loc, $allele, $gene, $feature, $feature_type, $consequence, $cDNA_position, $CDS_position, $Protein_position, $Amino_acids, $Codons, $Existing_variation, $Extra) = split("\t", $line_in);
+         chomp $line_in;
 
-         if ($feature =~ /dlt/)
+         unless ($line_in =~ /^#/)
          {
-            print join("\t", $sample, $feature, $consequence, $vars{$loc}) . "\n";
+            my ($var, $loc, $allele, $gene, $feature, $feature_type, $consequence, $cDNA_position, $CDS_position, $Protein_position, $Amino_acids, $Codons, $Existing_variation, $Extra) = split("\t", $line_in);
+
+            if ($feature =~ /dlt/)
+            {
+               $loc =~ m/^(.+):(\d+)/;
+               print join("\t", $sample, $feature, $consequence, $vars{"$1:$2"}) . "\n";
+            }
          }
       }
    }

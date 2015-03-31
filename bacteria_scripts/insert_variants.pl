@@ -140,7 +140,6 @@ else
       else
       {
          print STDERR "WARNING: Could not map $q_id\n";
-         next;
       }
 
       my $sample_str = "";
