@@ -3,6 +3,9 @@
 use strict;
 use warnings;
 
+# USAGE
+# ./diff_vep_batch.pl > diff_consequences.txt 2> diff_vep_batch.log
+
 my $root_dir = "/lustre/scratch108/bacteria/jl11/";
 
 open(SAMPLES, "samples.txt") || die("Could not open samples.txt\n");
@@ -11,6 +14,7 @@ while (my $sample = <SAMPLES>)
 {
    chomp($sample);
    chdir($sample);
+   print STDERR "Sample $sample\n";
 
    # get ref mapped to
    open(READS, "$root_dir/pairs_analysis/strep_pneumo_pairs/$sample/reads.txt") || die("Could not open reads.txt for $sample\n");
@@ -46,7 +50,10 @@ while (my $sample = <SAMPLES>)
    }
 
    # Run vep
-   system("perl /nfs/users/nfs_j/jl11/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/variant_effect_predictor.pl -i diffs.vcf --cache --species Streptococcus_pneumoniae_R6 --cache_version 25 --offline --output_file diff_effects --coding_only 1>&2");
+   if (scalar(keys %vars) != 0)
+   {
+      system("perl /nfs/users/nfs_j/jl11/installations/ensembl-tools-release-78/scripts/variant_effect_predictor/variant_effect_predictor.pl -i diffs.vcf --cache --species Streptococcus_pneumoniae_R6 --cache_version 25 --offline --output_file diff_effects --coding_only --force_overwrite &> vep_diff.log");
+   }
 
    # Summarise output
    open(VEP, "diff_effects") || die("Couldn't open vep output for sample $sample\n");
@@ -58,7 +65,10 @@ while (my $sample = <SAMPLES>)
       {
          my ($var, $loc, $allele, $gene, $feature, $feature_type, $consequence, $cDNA_position, $CDS_position, $Protein_position, $Amino_acids, $Codons, $Existing_variation, $Extra) = split("\t", $line_in);
 
-         print join("\t", $sample, $feature, $consequence, $vars{$loc}) . "\n";
+         if ($feature =~ /dlt/)
+         {
+            print join("\t", $sample, $feature, $consequence, $vars{$loc}) . "\n";
+         }
       }
    }
 

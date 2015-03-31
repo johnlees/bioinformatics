@@ -113,7 +113,14 @@ else
       }
       else
       {
-         $pos = $$blast_scores{$q_id}{start} - 1;
+         if (length($new_alt) == 1 && length($new_ref) == 1)
+         {
+            $pos = $$blast_scores{$q_id}{start} - 1;
+         }
+         else
+         {
+            $pos = $$blast_scores{$q_id}{start};
+         }
       }
 
       # Check which is really the ref
@@ -132,7 +139,7 @@ else
       }
       else
       {
-         print STDERR "Could not map $q_id\n";
+         print STDERR "WARNING: Could not map $q_id\n";
          next;
       }
 
