@@ -66,8 +66,27 @@ while (my $sample = <SAMPLES>)
 
             if ($feature =~ /dlt/)
             {
+               my $tissue;
                $loc =~ m/^(.+):(\d+)/;
-               print join("\t", $sample, $feature, $consequence, $vars{"$1:$2"}) . "\n";
+               if (defined ($vars{"$1:$2"}))
+               {
+                  $tissue = $vars{"$1:$2"};
+               }
+               else
+               {
+                  my $ins_pos = $2+1;
+
+                  if (defined ($vars{"$1:$ins_pos"}))
+                  {
+                     $tissue = $vars{"$1:$ins_pos"};
+                  }
+                  else
+                  {
+                     $tissue = "indetermined";
+                  }
+               }
+
+               print join("\t", $sample, $feature, $consequence, $tissue) . "\n";
             }
          }
       }
