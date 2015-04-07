@@ -48,34 +48,41 @@ if (!defined($map_cores))
    $map_cores = 2;
 }
 
-my $sed_command = "sed '$job" . "q;d' $lane_file";
-my $sample = `$sed_command`;
-chomp $sample;
-
-$sample =~ m/^(\d+)_(\d+)[#_](\d+)/;
-my $sample_name = "$1_$2_$3";
-my $sample_pathfind_name = "$1_$2#$3";
-
-if (!-d $sample_name)
+if (defined($help))
 {
-   mkdir $sample_name;
-   get_fastq($sample_pathfind_name, $sample_name);
-
-   chdir $sample_name;
-
-   open(READS, ">reads.txt") || die("Could not write to $sample_name/reads.txt\n");
-   print READS join("\t", $sample_name, File::Spec->rel2abs("$sample_name" . "_1.fastq.gz"), File::Spec->rel2abs("$sample_name" . "_2.fastq.gz")) . "\n";
-   close READS;
+   print $usage;
 }
 else
 {
-   chdir $sample_name;
+   my $sed_command = "sed '$job" . "q;d' $lane_file";
+   my $sample = `$sed_command`;
+   chomp $sample;
+
+   $sample =~ m/^(\d+)_(\d+)[#_](\d+)/;
+   my $sample_name = "$1_$2_$3";
+   my $sample_pathfind_name = "$1_$2#$3";
+
+   if (!-d $sample_name)
+   {
+      mkdir $sample_name;
+      get_fastq($sample_pathfind_name, $sample_name);
+
+      chdir $sample_name;
+
+      open(READS, ">reads.txt") || die("Could not write to $sample_name/reads.txt\n");
+      print READS join("\t", $sample_name, File::Spec->rel2abs("$sample_name" . "_1.fastq.gz"), File::Spec->rel2abs("$sample_name" . "_2.fastq.gz")) . "\n";
+      close READS;
+   }
+   else
+   {
+      chdir $sample_name;
+   }
+
+   my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -m bwa -a $reference_file -r reads.txt -o $sample_name -p 1e-3 -t $map_cores";
+   print STDERR $map_command . "\n";
+
+   system($map_command);
 }
-
-my $map_command = "perl ~/bioinformatics/bacteria_scripts/map_snp_call.pl -m bwa -a $reference_file -r reads.txt -o $sample_name -p 1e-3 -t $map_cores";
-print STDERR $map_command . "\n";
-
-system($map_command);
 
 exit(0);
 
