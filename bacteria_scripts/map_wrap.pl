@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl -w
 
 use strict;
 use warnings;
@@ -70,7 +70,7 @@ else
       chdir $sample_name;
 
       open(READS, ">reads.txt") || die("Could not write to $sample_name/reads.txt\n");
-      print READS join("\t", $sample_name, File::Spec->rel2abs("$sample_name" . "_1.fastq.gz"), File::Spec->rel2abs("$sample_name" . "_2.fastq.gz")) . "\n";
+      print READS join("\t", $sample_name, File::Spec->rel2abs("$sample_pathfind_name" . "_1.fastq.gz"), File::Spec->rel2abs("$sample_pathfind_name" . "_2.fastq.gz")) . "\n";
       close READS;
    }
    else
