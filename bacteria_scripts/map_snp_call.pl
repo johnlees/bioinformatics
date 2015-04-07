@@ -254,64 +254,61 @@ else
    }
 
    # Thread mapping?
-   my $mapping_threads;
+   my $sample_threads;
    if ($linear)
    {
-      $mapping_threads = 1;
+      $sample_threads = 1;
    }
    else
    {
-      $mapping_threads = $threads;
+      $sample_threads = scalar(@$samples);
    }
 
+   my @mapping_threads;
+   my $thread_per_sample = $threads / $sample_threads;
+   my $remaining_threads = $threads;
+
+   for (my $i = 0; $i < scalar(@$samples); $i++)
+   {
+      if ($thread_per_sample >= $remaining_threads)
+      {
+         $mapping_threads[$i] = $thread_per_sample;
+         $remaining_threads -= $thread_per_sample;
+      }
+      else
+      {
+         $mapping_threads[$i] = $remaining_threads;
+      }
+   }
+
+
    # Actually do mapping, using threads
-   for (my $i=0; $i<scalar(@$samples); $i+=$mapping_threads)
+   for (my $i=0; $i<scalar(@$samples); $i+=$sample_threads)
    {
       my @map_threads;
-      for (my $thread = 1; $thread <= $mapping_threads; $thread++)
+      for (my $thread = 0; $thread < $sample_threads; $thread++)
       {
          # Exit loop if all samples mapped
-         if ($i+$thread > scalar(@$samples))
+         if ($i+$thread >= scalar(@$samples))
          {
             last;
          }
 
-         my $sample = $$samples[$i+$thread-1];
+         my $sample = $$samples[$i+$thread];
          my $forward_reads = $$reads{$sample}{"forward"};
          my $reverse_reads = $$reads{$sample}{"backward"};
 
          if ($smalt)
          {
-            if (!$linear)
-            {
-               push(@map_threads, threads->create(\&mapping::run_smalt, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
-            }
-            else
-            {
-               push(@map_threads, threads->create(\&mapping::run_smalt, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
-            }
+            push(@map_threads, threads->create(\&mapping::run_smalt, $reference_file, $sample, $forward_reads, $reverse_reads, $mapping_threads[$i+$thread]));
          }
          elsif ($bwa)
          {
-            if (!$linear)
-            {
-               push(@map_threads, threads->create(\&mapping::run_bwa, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
-            }
-            else
-            {
-               push(@map_threads, threads->create(\&mapping::run_bwa, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
-            }
+            push(@map_threads, threads->create(\&mapping::run_bwa, $reference_file, $sample, $forward_reads, $reverse_reads, $mapping_threads[$i+$thread]));
          }
          elsif ($snap)
          {
-            if (!$linear)
-            {
-               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, 1));
-            }
-            else
-            {
-               push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, $threads));
-            }
+            push(@map_threads, threads->create(\&mapping::run_snap, $reference_file, $sample, $forward_reads, $reverse_reads, $mapping_threads[$i+$thread]));
          }
 
          assembly_common::add_tmp_file("$sample.mapping.log");
