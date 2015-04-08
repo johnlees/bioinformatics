@@ -114,10 +114,6 @@ sub merge_bams($$$)
    system ($merge_command);
 
    system ("samtools index $output_bam");
-
-   # Add tmp files
-   assembly_common::add_tmp_file($output_bam);
-   assembly_common::add_tmp_file("$output_bam.bai");
 }
 
 # Apply a list of filters to a vcf, filling in the filter column
@@ -367,7 +363,11 @@ else
    else
    {
       rename $bam_files[0], $merged_bam;
+      system ("samtools index $merged_bam");
    }
+   # Add tmp files
+   assembly_common::add_tmp_file($merged_bam);
+   assembly_common::add_tmp_file("$merged_bam.bai");
 
    # Call variants, running mpileup and then calling through a pipe
    print STDERR "variant calling...\n\n";
