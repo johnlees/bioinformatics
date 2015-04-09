@@ -31,7 +31,7 @@ while (my $line_in = <GFF>)
       {
          my @attrs = split(";", $attribute);
 
-         my ($new_id, $gene);
+         my $new_attr_string;
          foreach my $att_pair (@attrs)
          {
             my ($key, $value) = split("=", $att_pair);
@@ -40,20 +40,23 @@ while (my $line_in = <GFF>)
             {
                if ($value =~ /"(.+)"/)
                {
-                  $new_id = "\"$1.1\"";
+                  $new_attr_string .= "ID=\"$1.1\"";
                }
                else
                {
-                  $new_id = "\"$value.1\"";
+                  $new_attr_string .= "ID=\"$value.1\"";
                }
             }
-            elsif ($key eq "gene")
+            elsif ($key eq "gene" || $key eq "locus_tag")
             {
-               $gene = $value;
+               if (defined($value))
+               {
+                  $new_attr_string = ";$att_pair";
+               }
             }
          }
 
-         print join("\t", $seqname, $source, "gene", $start, $end, ".", $strand, $frame, "ID=$new_id;gene=$gene") . "\n";
+         print join("\t", $seqname, $source, "gene", $start, $end, ".", $strand, $frame, $new_attr_string) . "\n";
       }
       print $line_in . "\n";
    }
