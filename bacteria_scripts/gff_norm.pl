@@ -51,7 +51,7 @@ while (my $line_in = <GFF>)
             {
                if (defined($value))
                {
-                  $new_attr_string = ";$att_pair";
+                  $new_attr_string .= ";$att_pair";
                }
             }
          }
