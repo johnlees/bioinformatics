@@ -49,7 +49,7 @@ while (my $line_in = <GFF>)
             }
             elsif ($key eq "gene")
             {
-               $gene = $value
+               $gene = $value;
             }
          }
 
