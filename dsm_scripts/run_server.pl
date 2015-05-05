@@ -49,6 +49,11 @@ else
    my $num_jobs = `wc -l $file_list | cut -d " " -f 1`;
    chomp $num_jobs;
 
+   if (!defined($memory))
+   {
+      $memory = 100;
+   }
+
    system("bsub -J \"server[1-$num_jobs]\" -o server.%J.%I.o -e server.%J.%I.e -R \"select[mem>$memory] rusage[mem=$memory]\" -M$memory mpirun $dsm_location/wrapper-LSF/server_wrapper.pl $fmin $max_depth $start_port $file_list");
 }
 
