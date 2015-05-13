@@ -31,7 +31,15 @@ for (my $i = 1; $i <= $total; $i++)
       my $false_negatives = $real_positives - $true_positives;
 
       my $false_positives = $calls - $true_positives;
-      my $false_positive_rate = $false_positives/$calls;
+      my $false_positive_rate;
+      if ($calls == 0)
+      {
+         $false_positive_rate = 0;
+      }
+      else
+      {
+         $false_positive_rate = $false_positives/$calls;
+      }
 
       print join("\t", $i, $type, $power, $false_positive_rate, $false_negatives, "$false_positives\n");
    }
