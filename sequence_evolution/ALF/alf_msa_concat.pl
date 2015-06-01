@@ -1,10 +1,14 @@
 #!/usr/bin/perl -w
 
+# Concatenates MSA output files which are by gene, into files by organism
+# usage: ./alf_msa_concat.pl msa_files.txt
+
 use strict;
 use warnings;
 
 use Bio::SeqIO;
 
+# Read list of MSAs from input
 my $seq_alignment_files = $ARGV[0];
 
 open(LIST, $seq_alignment_files) || die("Could not open $seq_alignment_files\n");

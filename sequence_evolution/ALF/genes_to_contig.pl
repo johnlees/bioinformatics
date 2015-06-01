@@ -3,6 +3,10 @@
 use strict;
 use warnings;
 
+# Converts a multicontig file into one with just one contig, for use as input
+# as an alignment file.
+# Usage ./genes_to_contig.pl input_files.txt
+
 use Bio::SeqIO;
 
 my $input_files = $ARGV[0];
