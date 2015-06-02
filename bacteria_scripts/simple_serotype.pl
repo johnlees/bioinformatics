@@ -173,9 +173,8 @@ else
    my @top_coverages = @coverages{@top_serotypes};
    print join("\t", splice(@top_coverages, 0, $num_serotypes)) . "\n";
 
-   # TODO Clean up
-   unlink($sero_bam);
-
+   # Clean up
+   unlink($sero_bam, "$sero_bam.bai", $pileup_file,"snap_$sample_id.log");
 }
 
 exit(0);
