@@ -25,7 +25,7 @@ my $smalt_s = 6;
 
 my $smalt_max_insert = 750;
 
-my $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
+our $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
 
 # Set java flags on module load. Use GATK key to disable phone home
 INIT
