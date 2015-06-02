@@ -57,7 +57,7 @@ sub run_snap($$$$)
 
    my $bam_name = "$sample_id.bam";
    my $snap_command = "$mapping::snap_location paired snap_index $forward_reads $reverse_reads -R '\@RG\\tID:$sample_id\\tSM:$sample_id'"
-   . " -t 1 -= -so -sm $sort_mem -o $bam_name -om 1 -D 2 -F a";
+   . " -t 1 -= -so -sm $sort_mem -o $bam_name -om 1 -D 2 -F a &> snap_$sample_id.log";
 
    system($snap_command);
 
