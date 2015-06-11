@@ -55,6 +55,9 @@ sub run_snap($$$$)
 {
    my ($forward_reads, $reverse_reads, $sample_id, $reference_fasta) = @_;
 
+   # Create reference index
+   mapping::snap_index($reference_fasta);
+
    my $bam_name = "$sample_id.bam";
    my $snap_command = "$mapping::snap_location paired snap_index $forward_reads $reverse_reads -R '\@RG\\tID:$sample_id\\tSM:$sample_id'"
    . " -t 1 -= -so -sm $sort_mem -o $bam_name -om 1 -D 2 -F a &> snap_$sample_id.log";
@@ -122,7 +125,7 @@ else
    }
 
    # Map to reference sequences
-   mapping::snap_index($references);
+   
    my $sero_bam = run_snap($forward_reads, $reverse_reads, $sample_id, $references);
 
    # Run and read pileup result. Count positions where at least a certain number of
