@@ -8,6 +8,11 @@ use Bio::SeqIO;
 # Converts DAWG output (fasta) into output usable by ALF scripts (MSA and DB)
 # usage
 # ./dawg_to_alf.pl speciesMapping.txt intergenic_coordinates.txt dawg_output.mfa
+#
+# NOTE: Warning messages are due to writing sequence which is all gaps, but is
+# in the case the right thing to do (for the intended workflow following from
+# this script)
+#
 
 my $species_mapping = $ARGV[0];
 my $intergenic_coordinates = $ARGV[1];
@@ -57,8 +62,19 @@ while (my $evolved_seq = $fasta_in->next_seq())
 {
    foreach my $gene_nr (keys %coords)
    {
-      # great line of code coming up
-      $coords{$gene_nr}{file}->write_seq(Bio::Seq(-seq=>$evolved_seq->subseq($coords{$gene_nr}{start}, $coords{$gene_nr}{end}), -display_id=>$alf_names{$evolved_seq->display_id()}));
+      # great line of code coming up, which does amusingly actually work
+      $coords{$gene_nr}{file}->write_seq(Bio::Seq->new(-seq=>$evolved_seq->subseq($coords{$gene_nr}{start}, $coords{$gene_nr}{end}), -display_id=>$alf_names{$evolved_seq->display_id()}));
+
+      # easier to follow, doesn't write out gap only seqs either:
+      #my $write_seq = $evolved_seq->subseq($coords{$gene_nr}{start}, $coords{$gene_nr}{end});
+      #if ($write_seq ne "" && $write_seq !~ /^-+$/)
+      #{
+      #   $coords{$gene_nr}{file}->write_seq(Bio::Seq->new(-seq=>$write_seq, -display_id=>$alf_names{$evolved_seq->display_id()}));
+      #}
+      #else
+      #{
+      #   print STDERR "gene_nr: $gene_nr start: $coords{$gene_nr}{start} end: $coords{$gene_nr}{end}\n";
+      #}
    }
 }
 
