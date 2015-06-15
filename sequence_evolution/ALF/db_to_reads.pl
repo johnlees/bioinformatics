@@ -25,7 +25,7 @@ if ($job_id < 1000)
 }
 else
 {
-   $file_name = "SE$job_id\_dna.fa";
+   $file_name = "SE$job_id";
 }
 system("~/bioinformatics/sequence_evolution/ALF/alf_db_to_fasta.pl DB/$file_name\_dna.fa > DB/$file_name\_genome.fa");
 
