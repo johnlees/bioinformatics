@@ -82,11 +82,11 @@ while (my $sample = <SAMPLES>)
                   }
                   else
                   {
-                     $tissue = "indetermined";
+                     $tissue = "undetermined";
                   }
                }
 
-               print join("\t", $sample, $feature, $consequence, $tissue) . "\n";
+               print join("\t", $sample, $loc, $feature, $consequence, $tissue) . "\n";
             }
          }
       }
