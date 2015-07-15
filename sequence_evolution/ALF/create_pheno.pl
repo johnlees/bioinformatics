@@ -8,6 +8,8 @@
 use strict;
 use warnings;
 
+print STDERR "WARNING: Output may contain repeats. Use `uniq -w 6 output > cleaned_output'\n";
+
 my $vcf_in = $ARGV[0];
 my $pos_in = $ARGV[1];
 my $ratio = $ARGV[2];
