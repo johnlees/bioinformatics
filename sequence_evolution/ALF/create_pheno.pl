@@ -49,7 +49,7 @@ while (my $vcf_line = <VCF>)
          foreach my $sample (@sample_names)
          {
             my $pheno = 0;
-            if ($vals[$i] eq $ref)
+            if ($vals[$i] eq ".")
             {
                if (rand() < $ref_prob)
                {
@@ -68,6 +68,8 @@ while (my $vcf_line = <VCF>)
 
             $i++;
          }
+
+         last;
       }
    }
 }
