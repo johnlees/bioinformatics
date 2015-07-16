@@ -18,19 +18,46 @@ while (my $meta_line = <META>)
       chomp $serotype_list;
 
       my $format_sero = "";
-      my (@serotypes) = split("\t", $serotype_list);
 
-      foreach my $serotype (@serotypes)
+      if ($serotype_list eq "")
       {
-         if ($serotype ne "-")
+         $lane =~ m/^(\d+)_(\d+)(#|_)(\d+)/;
+         my $srst2_lane = "$1_$2_$4";
+         $serotype_list = `sed '1d' /lustre/scratch108/bacteria/jl11/mlst_serotype/serotype/srst2/results/$srst2_lane\__$lane.95_capsule_sequences_srst2.scores | cut -f 1`;
+
+         chomp $serotype_list;
+         my @serotype_lines = split("\n", $serotype_list);
+         foreach my $serotype (@serotype_lines)
          {
-            if ($format_sero ne "")
+            if ($serotype ne "-")
             {
-               $format_sero .= "/$serotype";
+               if ($format_sero ne "")
+               {
+                  $format_sero .= "/$serotype";
+               }
+               else
+               {
+                  $format_sero = $serotype;
+               }
             }
-            else
+         }
+      }
+      else
+      {
+         my (@serotypes) = split("\t", $serotype_list);
+
+         foreach my $serotype (@serotypes)
+         {
+            if ($serotype ne "-")
             {
-               $format_sero = $serotype;
+               if ($format_sero ne "")
+               {
+                  $format_sero .= "/$serotype";
+               }
+               else
+               {
+                  $format_sero = $serotype;
+               }
             }
          }
       }
