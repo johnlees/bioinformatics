@@ -19,14 +19,17 @@ Gather the output of pairs_pipe.pl
    --genes           Number of mutations by gene (count each sample once)
    --orfs            Names of all genes, to investigate unannotated proteins
 
+   --exclude         List of gene names to exclude annotation from (in standard mode)
+
    -h, --help        Shows this help.
 
 USAGE
 
-my ($pairs_file, $gene_mode, $orf_mode, $help);
+my ($pairs_file, $gene_mode, $orf_mode, $exclude_genes, $help);
 GetOptions("samples=s" => \$pairs_file,
            "genes" => \$gene_mode,
            "orfs" => \$orf_mode,
+           "exclude=s" => \$exclude_genes,
            "help|h" => \$help) || die("$!\n$usage_message");
 
 if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($orf_mode)))
@@ -37,9 +40,18 @@ if (defined($help) || !defined($pairs_file) || (defined($gene_mode) && defined($
 
 open(PAIRS, $pairs_file) || die("Could not open $pairs_file\n");
 
+my @excluded_genes;
 if (!$gene_mode && !$orf_mode)
 {
-   print join("\t", "Sample", "SNPs", "INDELs", "Total", "Genes") . "\n";
+   if (!$exclude_genes)
+   {
+      print join("\t", "Sample", "SNPs", "INDELs", "Total", "Genes") . "\n";
+   }
+   else
+   {
+      @excluded_genes = split(",", $exclude_genes);
+      print join("\t", "Sample", "SNPs", "INDELs", "Total", "Adjusted Total", "Genes") . "\n";
+   }
 }
 
 my $header = <PAIRS>;
@@ -75,11 +87,19 @@ while (my $line_in = <PAIRS>)
             @orf_list = split("\n", $orfs);
          }
 
+         my $adjust = 0;
          for (my $i = 0; $i < scalar(@gene_list); $i++)
          {
             if ($gene_list[$i] =~ /^(.+)_(\d+)$/)
             {
                $gene_list[$i] = $1;
+               foreach my $excluded (@excluded_genes)
+               {
+                  if ($gene_list[$i] eq $excluded)
+                  {
+                     $adjust--;
+                  }
+               }
             }
             elsif ($orf_mode && $gene_list[$i] eq "1")
             {
@@ -89,7 +109,14 @@ while (my $line_in = <PAIRS>)
 
          if (!$gene_mode && !$orf_mode)
          {
-            print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
+            if (!$exclude_genes)
+            {
+               print join("\t", $sample, $snps, $indels, $total, @gene_list) . "\n";
+            }
+            else
+            {
+               print join("\t", $sample, $snps, $indels, $total, $total + $adjust, @gene_list) . "\n";
+            }
          }
 
          my %counted;
