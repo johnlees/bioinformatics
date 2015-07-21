@@ -127,9 +127,8 @@ model {
   kappa ~ dgamma(Skappa, Rkappa)
 
   # Top level constants for hyperpriors. Same for blood and csf
-  # Beta dist for mu - estimated from Manso et al 2014 fig 4h
-  # 84 mice, 5% representation of allele 1.2 in blood
-  Amu <- 80
+  # Beta dist for mu - based on long-range PCR of a subset of samples
+  Amu <- 8
   Bmu <- 4
 
   # Gamma dist for kappa. First convert mean and sd to shape and rate
@@ -315,16 +314,14 @@ model {
 "
 writeLines(jags_model2_spec,con="model2.txt")
 
-# Dirichlet dist for mu - estimated from Manso et al 2014 fig 4h
-# 84 mice. A: 20; B: 10; C: 1; D: 3; E: 65; F: 1
-# AlphaMu <- c(20, 10, 1, 3, 65, 1)
-manso_priors = c(20, 10, 1, 3, 65, 1)
+# Dirichlet dist for mu - estimated from PCR of subset of samples
+pcr_priors = c(3.689377127,3.560947245,1.73369035,2.311819592,2.77156998,1)
 
 # Convert data for model to a list for use with JAGS
 three_prime_data = list(num_tissues = length(unique(three_prime_reads$Tissue)),
   num_samples = length(three_prime_reads$TotalReads), num_alleles = length(alleles),
   tissue = three_prime_reads$Tissue, N = three_prime_reads$TotalReads,
-  y = as.matrix(three_prime_reads[,alleles]), alpha_priors = manso_priors)
+  y = as.matrix(three_prime_reads[,alleles]), alpha_priors = pcr_priors)
 
 #
 # JAGS chain parameters
