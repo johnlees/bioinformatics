@@ -93,17 +93,18 @@ while (my $line_in = <PAIRS>)
             if ($gene_list[$i] =~ /^(.+)_(\d+)$/)
             {
                $gene_list[$i] = $1;
-               foreach my $excluded (@excluded_genes)
-               {
-                  if ($gene_list[$i] eq $excluded)
-                  {
-                     $adjust--;
-                  }
-               }
             }
             elsif ($orf_mode && $gene_list[$i] eq "1")
             {
                $gene_list[$i] = "ORF_" . $orf_list[$i];
+            }
+
+            foreach my $excluded (@excluded_genes)
+            {
+               if ($gene_list[$i] eq $excluded)
+               {
+                  $adjust--;
+               }
             }
          }
 
