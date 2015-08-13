@@ -28,6 +28,7 @@ Changes coordinates of vcf between references
    --new_ref           Reference to lift over to
    --vcf               VCF file to operate on
 
+   --new_chrom         Name of new chromosome. Default AE007317
    --dirty             Don't clean up temporary files
 
    -h, --help          Shows this help.
@@ -38,7 +39,7 @@ USAGE
 my $tmp_ref = "reference_renamed.fa";
 my $blast_prefix = "blast_windows";
 
-my $new_chrom = "AE007317";
+my $default_new_chrom = "AE007317";
 
 #****************************************************************************************#
 #* Functions                                                                            *#
@@ -49,11 +50,12 @@ my $new_chrom = "AE007317";
 #****************************************************************************************#
 
 #* gets input parameters
-my ($map_ref, $new_ref, $vcf_in, $dirty, $help);
+my ($map_ref, $new_ref, $vcf_in, $new_chrom, $dirty, $help);
 GetOptions ("map_ref=s"  => \$map_ref,
             "new_ref=s"  => \$new_ref,
             "vcf=s"      => \$vcf_in,
             "dirty"      => \$dirty,
+            "new_chrom=s" => \$new_chrom,
             "help|h"     => \$help
 		   ) or die($usage_message);
 
@@ -68,6 +70,11 @@ elsif (!defined($map_ref) || !defined($new_ref) || !defined($vcf_in))
 }
 else
 {
+   if(!defined($new_chrom))
+   {
+      $new_chrom = $default_new_chrom;
+   }
+
    assembly_common::standardise_contig_names($map_ref, $tmp_ref);
 
    my $blast_output = "$blast_prefix.fa";
