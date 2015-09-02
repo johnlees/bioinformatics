@@ -78,13 +78,10 @@ else
    # where possible
    print STDERR "Now mapping...\n\n";
 
-   mapping::bwa_index($reference_file);
-
-   assembly_common::add_tmp_file("$reference_file.amb");
-   assembly_common::add_tmp_file("$reference_file.ann");
-   assembly_common::add_tmp_file("$reference_file.bwt");
-   assembly_common::add_tmp_file("$reference_file.pac");
-   assembly_common::add_tmp_file("$reference_file.sa");
+   if (!-e "$reference_file.bwt")
+   {
+      mapping::bwa_index($reference_file);
+   }
 
    my $sample = $$samples[0];
    my $forward_reads = $$reads{$sample}{"forward"};
