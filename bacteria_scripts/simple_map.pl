@@ -86,7 +86,6 @@ else
    assembly_common::add_tmp_file("$reference_file.pac");
    assembly_common::add_tmp_file("$reference_file.sa");
 
-
    my $sample = $$samples[0];
    my $forward_reads = $$reads{$sample}{"forward"};
    my $reverse_reads = $$reads{$sample}{"backward"};
@@ -108,9 +107,6 @@ else
 
       assembly_common::add_tmp_file("$bam_file.picard.log");
       assembly_common::add_tmp_file("$bam_file.dups");
-
-      assembly_common::add_tmp_file("$reference_file.dict");
-      assembly_common::add_tmp_file("$reference_file.fai");
    }
 
    # Remove temporary files
