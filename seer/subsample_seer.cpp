@@ -32,7 +32,7 @@ const double repeats = 100;
 const double element_MAF = 0.25; // Number of samples gene/SNP is in
 const double target_Sr = 1; // Ratio of cases to controls
 
-const std::string kmer_input = "gene_kmers.txt.gz";
+const std::string seer_location = "~/installations/pangwas/src/seer";
 
 struct Sample
 {
@@ -51,7 +51,7 @@ std::string exec(const char* cmd);
 // Functors
 struct seer_hits
 {
-   seer_hits(const std::vector<Sample> _sample_names, const arma::mat _dsm_mat, const double _MAF, const double _Sr) : sample_names(_sample_names), dsm_mat(_dsm_mat), MAF(_MAF), Sr(_Sr)
+   seer_hits(const std::string _kmer_input, const std::vector<Sample> _sample_names, const arma::mat _dsm_mat, const double _MAF, const double _Sr) : kmer_input(_kmer_input), sample_names(_sample_names), dsm_mat(_dsm_mat), MAF(_MAF), Sr(_Sr)
    {
    }
 
@@ -61,7 +61,7 @@ struct seer_hits
       std::string pheno_file = generate_pheno(sample_names, samples_kept, p_case_ne(OR, MAF, Sr));
       std::string struct_mat = cut_struct_mat(dsm_mat, samples_kept);
 
-      std::string seer_cmd = "./seer -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat;
+      std::string seer_cmd = seer_location + " -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat;
       std::string seer_return = exec(seer_cmd.c_str());
 
       // Delete tmp files
@@ -72,6 +72,7 @@ struct seer_hits
    }
 
    private:
+      std::string kmer_input;
       std::vector<Sample> sample_names;
       arma::mat dsm_mat;
       const double MAF;
@@ -82,14 +83,14 @@ std::vector<int> reservoir_sample(const size_t size, const size_t max_size)
 {
    std::vector<int> sample_indices;
 
-   for (int i = 1; i <= size; ++i)
+   for (unsigned int i = 1; i <= size; ++i)
    {
       sample_indices.push_back(i);
    }
 
-   for (int i = size + 1; i<= max_size; ++i)
+   for (unsigned int i = size + 1; i<= max_size; ++i)
    {
-      int j = rand() % i + 1;
+      unsigned int j = rand() % i + 1;
       if (j <= size)
       {
          sample_indices[j] = i;
@@ -180,11 +181,12 @@ std::string exec(const char* cmd)
 
 int main (int argc, char *argv[])
 {
-   if (argc != 3)
+   if (argc != 4)
    {
-      throw std::runtime_error("Usage is: ./subsample_seer sample_names.txt dsm_matrix");
+      throw std::runtime_error("Usage is: ./subsample_seer sample_names.txt dsm_matrix kmer_file");
    }
 
+   // Read in samples and element presence
    std::vector<Sample> all_samples;
    std::ifstream sample_file(argv[1]);
    if (!sample_file)
@@ -204,6 +206,7 @@ int main (int argc, char *argv[])
       all_samples.push_back(sample_read);
    }
 
+   // Read in struct matrix
    arma::mat struct_mat;
    std::string dsm_file_name(argv[2]);
    bool mds_loaded = struct_mat.load(dsm_file_name);
@@ -212,9 +215,12 @@ int main (int argc, char *argv[])
       throw std::runtime_error("Could not load mds matrix " + dsm_file_name);
    }
 
+   // kmer file name
+   std::string kmer_file_name(argv[3]);
+
    // Loop over odds ratios, then sample number
    // (const std::vector<std::string> _sample_names, const arma::mat _dsm_mat, const double _OR, const double _MAF, const double _Sr, const size_t _max_samples
-   seer_hits run_seer(all_samples, struct_mat, element_MAF, target_Sr);
+   seer_hits run_seer(kmer_file_name, all_samples, struct_mat, element_MAF, target_Sr);
    for (int OR = start_OR; OR <= end_OR; OR += OR_step)
    {
       for (int num_samples = start_samples; num_samples <= end_samples; num_samples += samples_step)
