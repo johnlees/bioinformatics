@@ -19,8 +19,8 @@
 #include <armadillo>
 
 // Test size and range set here
-const double start_OR = 0.5;
-const double OR_step = 1;
+const double start_OR = 1;
+const double OR_step = 0.5;
 const double end_OR = 5.5;
 
 const int start_samples = 50;
@@ -29,7 +29,6 @@ const int end_samples = 3000;
 
 const double repeats = 100;
 
-const double element_MAF = 0.25; // Number of samples gene/SNP is in
 const double target_Sr = 1; // Ratio of cases to controls
 
 const std::string seer_location = "~/installations/pangwas/src/seer";
@@ -68,7 +67,7 @@ struct seer_hits
       std::remove(pheno_file.c_str());
       std::remove(struct_mat.c_str());
 
-      return stoi(seer_return);
+      return std::stoi(seer_return);
    }
 
    private:
@@ -97,6 +96,7 @@ std::vector<int> reservoir_sample(const size_t size, const size_t max_size)
       }
    }
 
+   std::sort(sample_indices.begin(), sample_indices.end());
    return sample_indices;
 }
 
@@ -116,14 +116,15 @@ std::string generate_pheno(const std::vector<Sample>& sample_names, const std::v
    {
       // Generate pheno based on OR here
       int pheno = 0;
-      double rand_nr = rand();
+      double rand_nr = ((double) rand() / (RAND_MAX));
       if ((sample_names[*keep_it].element_present && rand_nr < p_e) ||
             (!sample_names[*keep_it].element_present && rand_nr < p_ne))
       {
          pheno = 1;
       }
 
-      pheno_file << sample_names[*keep_it].sample_name << "\t" << pheno << "\n";
+      std::string sample_out = sample_names[*keep_it].sample_name;
+      pheno_file << sample_out << "\t" << sample_out << "\t" << pheno << "\n";
    }
 
    std::string file_name(tmp_name_ptr);
@@ -157,7 +158,7 @@ std::string cut_struct_mat(const arma::mat& struct_mat, const std::vector<int>& 
 
    char * tmp_name_ptr;
    tmp_name_ptr = std::tmpnam(NULL);
-   tmp_struct.save(tmp_name_ptr);
+   tmp_struct.save(tmp_name_ptr, arma::hdf5_binary);
 
    std::string file_name(tmp_name_ptr);
    return file_name;
@@ -194,16 +195,25 @@ int main (int argc, char *argv[])
       throw std::runtime_error("Could not open sample file");
    }
 
+   unsigned int present_total = 0;
    while (sample_file)
    {
       Sample sample_read;
       std::string name_buf, present_buf;
       sample_file >> name_buf >> present_buf;
 
-      sample_read.sample_name = name_buf;
-      sample_read.element_present = stoi(present_buf);
+      if (sample_file)
+      {
+         sample_read.sample_name = name_buf;
+         sample_read.element_present = std::stoi(present_buf);
 
-      all_samples.push_back(sample_read);
+         all_samples.push_back(sample_read);
+
+         if (sample_read.element_present)
+         {
+            ++present_total;
+         }
+      }
    }
 
    // Read in struct matrix
@@ -220,14 +230,14 @@ int main (int argc, char *argv[])
 
    // Loop over odds ratios, then sample number
    // (const std::vector<std::string> _sample_names, const arma::mat _dsm_mat, const double _OR, const double _MAF, const double _Sr, const size_t _max_samples
-   seer_hits run_seer(kmer_file_name, all_samples, struct_mat, element_MAF, target_Sr);
-   for (int OR = start_OR; OR <= end_OR; OR += OR_step)
+   seer_hits run_seer(kmer_file_name, all_samples, struct_mat, (double) present_total/all_samples.size(), target_Sr);
+   for (double OR = start_OR; OR <= end_OR; OR += OR_step)
    {
       for (int num_samples = start_samples; num_samples <= end_samples; num_samples += samples_step)
       {
          for (int repeat = 1; repeat <= repeats; ++repeat)
          {
-            std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(OR, num_samples) << "\n";
+            std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << "\n";
          }
       }
    }
