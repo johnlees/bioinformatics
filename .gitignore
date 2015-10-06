@@ -7,10 +7,11 @@ Build
 !Build/
 Build.bat
 .last_cover_stats
-Makefile
 Makefile.old
 MANIFEST.bak
 META.yml
 MYMETA.yml
 nytprof.out
 pm_to_blib
+*.o
+subsample_seer
