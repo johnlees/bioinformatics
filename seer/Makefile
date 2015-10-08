@@ -4,7 +4,7 @@ BINDIR=$(PREFIX)/bin
 #CXX=icpc
 CXXFLAGS=-Wall -g -O0 -std=c++11
 CPPFLAGS=-I$(PREFIX)/include
-LDLIBS=-L$(PREFIX)/lib -larmadillo -lhdf5 -lm
+LDLIBS=-L$(PREFIX)/lib -lhdf5 -larmadillo -lz -lm
 
 PROGRAMS=subsample_seer
 

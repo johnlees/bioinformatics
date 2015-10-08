@@ -28,6 +28,7 @@ const int samples_step = 50;
 const int end_samples = 3000;
 
 const double repeats = 100;
+const unsigned int rand_seed = 1;
 
 const double target_Sr = 1; // Ratio of cases to controls
 
@@ -46,6 +47,7 @@ double p_case_ne(const double OR, const double MAF, const double Sr);
 double p_case_e(const double OR, const double MAF, const double Sr);
 std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const double p_ne);
 std::string exec(const char* cmd);
+int parse_seer(std::string& seer_output);
 
 // Functors
 struct seer_hits
@@ -60,14 +62,15 @@ struct seer_hits
       std::string pheno_file = generate_pheno(sample_names, samples_kept, p_case_ne(OR, MAF, Sr));
       std::string struct_mat = cut_struct_mat(dsm_mat, samples_kept);
 
-      std::string seer_cmd = seer_location + " -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat;
+      std::string seer_cmd = seer_location + " -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat + " | wc -l";
       std::string seer_return = exec(seer_cmd.c_str());
+      int num_hits = parse_seer(seer_return);
 
       // Delete tmp files
       std::remove(pheno_file.c_str());
       std::remove(struct_mat.c_str());
 
-      return std::stoi(seer_return);
+      return num_hits;
    }
 
    private:
@@ -117,13 +120,13 @@ std::string generate_pheno(const std::vector<Sample>& sample_names, const std::v
       // Generate pheno based on OR here
       int pheno = 0;
       double rand_nr = ((double) rand() / (RAND_MAX));
-      if ((sample_names[*keep_it].element_present && rand_nr < p_e) ||
-            (!sample_names[*keep_it].element_present && rand_nr < p_ne))
+      if ((sample_names[*keep_it - 1].element_present && rand_nr < p_e) ||
+            (!sample_names[*keep_it - 1].element_present && rand_nr < p_ne))
       {
          pheno = 1;
       }
 
-      std::string sample_out = sample_names[*keep_it].sample_name;
+      std::string sample_out = sample_names[*keep_it - 1].sample_name;
       pheno_file << sample_out << "\t" << sample_out << "\t" << pheno << "\n";
    }
 
@@ -150,7 +153,7 @@ std::string cut_struct_mat(const arma::mat& struct_mat, const std::vector<int>& 
    int i = 0;
    for (auto it = rows.begin(); it != rows.end(); ++it)
    {
-      keep_rows[i] = *it;
+      keep_rows[i] = *it - 1;
       ++i;
    }
 
@@ -180,12 +183,36 @@ std::string exec(const char* cmd)
     return result;
 }
 
+int parse_seer(std::string& seer_output)
+{
+   std::stringstream all_output(seer_output);
+   std::string line_buf;
+
+   int hits = 0;
+   while (std::getline(all_output, line_buf))
+   {
+      std::stringstream line_in(line_buf);
+
+      std::string kmer;
+      double maf, chisq, adjp, beta;
+      if (line_in >> kmer >> maf >> chisq >> adjp >> beta)
+      {
+         ++hits;
+      }
+   }
+
+   return hits;
+}
+
 int main (int argc, char *argv[])
 {
    if (argc != 4)
    {
       throw std::runtime_error("Usage is: ./subsample_seer sample_names.txt dsm_matrix kmer_file");
    }
+
+   // Seed random number generator
+   srand(rand_seed);
 
    // Read in samples and element presence
    std::vector<Sample> all_samples;
@@ -237,7 +264,7 @@ int main (int argc, char *argv[])
       {
          for (int repeat = 1; repeat <= repeats; ++repeat)
          {
-            std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << "\n";
+            std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
          }
       }
    }
