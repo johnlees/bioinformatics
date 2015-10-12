@@ -15,21 +15,21 @@
 #include <thread>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
-// Armadillo/dlib headers
+// Armadillo/boost headers
 #include <armadillo>
 
-// Test size and range set here
-const double start_OR = 1.2;
-const double OR_step = 1.2;
-const double end_OR = 10;
+#include <boost/filesystem.hpp>
+using namespace boost::filesystem;
 
+// Test size and range set here
 const int start_samples = 50;
 const int samples_step = 50;
 const int end_samples = 3000;
 
 const double repeats = 100;
-const unsigned int rand_seed = 1;
+const unsigned int rand_seed = time(NULL);
 
 const double target_Sr = 1; // Ratio of cases to controls
 
@@ -105,10 +105,8 @@ std::vector<int> reservoir_sample(const size_t size, const size_t max_size)
 
 std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const std::tuple<double,double>& p_cases)
 {
-   char * tmp_name_ptr;
-   tmp_name_ptr = std::tmpnam(NULL);
-
-   std::ofstream pheno_file(tmp_name_ptr);
+   path file_name = unique_path();
+   std::ofstream pheno_file(file_name.string().c_str());
    if (!pheno_file)
    {
       throw std::runtime_error("Could not write to tmp pheno file");
@@ -131,8 +129,7 @@ std::string generate_pheno(const std::vector<Sample>& sample_names, const std::v
       pheno_file << sample_out << "\t" << sample_out << "\t" << pheno << "\n";
    }
 
-   std::string file_name(tmp_name_ptr);
-   return file_name;
+   return file_name.string();
 }
 
 // Given a sample doesn't have the kmer, return the probability of having case
@@ -169,12 +166,10 @@ std::string cut_struct_mat(const arma::mat& struct_mat, const std::vector<int>& 
 
    arma::mat tmp_struct = struct_mat.rows(keep_rows);
 
-   char * tmp_name_ptr;
-   tmp_name_ptr = std::tmpnam(NULL);
-   tmp_struct.save(tmp_name_ptr, arma::hdf5_binary);
+   path file_name = unique_path();
+   tmp_struct.save(file_name.string(), arma::hdf5_binary);
 
-   std::string file_name(tmp_name_ptr);
-   return file_name;
+   return file_name.string();
 }
 
 // From http://stackoverflow.com/questions/478898/how-to-execute-a-command-and-get-output-of-command-within-c
@@ -218,7 +213,7 @@ int main (int argc, char *argv[])
 {
    if (argc != 5)
    {
-      throw std::runtime_error("Usage is: ./subsample_seer sample_names.txt dsm_matrix kmer_file");
+      throw std::runtime_error("Usage is: ./subsample_seer <sample names.txt> <dsm matrix> <kmer file> <odds ratio>");
    }
 
    // Seed random number generator
@@ -265,29 +260,20 @@ int main (int argc, char *argv[])
    // kmer file name
    std::string kmer_file_name(argv[3]);
 
-   // threads
-   int num_threads = std::stoi(argv[4]);
-   std::queue<std::thread> seer_threads;
-   seer_threads.reserve(num_threads);
+   // odds ratio
+   double OR = std::stof(argv[4]);
 
    // Loop over odds ratios, then sample number
    // (const std::vector<std::string> _sample_names, const arma::mat _dsm_mat, const double _OR, const double _MAF, const double _Sr, const size_t _max_samples
    seer_hits run_seer(kmer_file_name, all_samples, struct_mat, (double) present_total/all_samples.size(), target_Sr);
-   for (double OR = start_OR; OR <= end_OR; OR *= OR_step)
+   for (int num_samples = start_samples; num_samples <= end_samples; num_samples += samples_step)
    {
-      for (int num_samples = start_samples; num_samples <= end_samples; num_samples += samples_step)
+      for (int repeat = 1; repeat <= repeats; ++repeat)
       {
-         for (int repeat = 1; repeat <= repeats; ++repeat)
-         {
-            if (seer_threads.size() == num_threads)
-            {
-               std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
-               seer_threads.front()
-            }
-            std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
-         }
+         std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
       }
    }
+
 
    return 0;
 }
