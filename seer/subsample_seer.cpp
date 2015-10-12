@@ -12,6 +12,7 @@
 #include <vector>
 #include <unordered_map>
 #include <regex>
+#include <thread>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -19,9 +20,9 @@
 #include <armadillo>
 
 // Test size and range set here
-const double start_OR = 1;
-const double OR_step = 0.5;
-const double end_OR = 5.5;
+const double start_OR = 1.2;
+const double OR_step = 1.2;
+const double end_OR = 10;
 
 const int start_samples = 50;
 const int samples_step = 50;
@@ -43,9 +44,8 @@ struct Sample
 // Functions
 std::vector<int> reservoir_sample(const size_t size, const size_t max_size); // Indices of samples subsampled
 std::string cut_struct_mat(const arma::mat& struct_mat, const std::vector<int>& rows); // Extracts only the used rows of the pop_struct matrix
-double p_case_ne(const double OR, const double MAF, const double Sr);
-double p_case_e(const double OR, const double MAF, const double Sr);
-std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const double p_ne);
+std::tuple<double, double> p_case(const double OR, const double MAF, const double Sr);
+std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const std::tuple<double,double>& p_cases);
 std::string exec(const char* cmd);
 int parse_seer(std::string& seer_output);
 
@@ -59,10 +59,10 @@ struct seer_hits
    int operator()(const size_t num_samples, const double OR) const
    {
       std::vector<int> samples_kept = reservoir_sample(num_samples, sample_names.size());
-      std::string pheno_file = generate_pheno(sample_names, samples_kept, p_case_ne(OR, MAF, Sr));
+      std::string pheno_file = generate_pheno(sample_names, samples_kept, p_case(OR, MAF, Sr));
       std::string struct_mat = cut_struct_mat(dsm_mat, samples_kept);
 
-      std::string seer_cmd = seer_location + " -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat + " | wc -l";
+      std::string seer_cmd = seer_location + " -k " + kmer_input + " -p " + pheno_file + " --struct " + struct_mat;
       std::string seer_return = exec(seer_cmd.c_str());
       int num_hits = parse_seer(seer_return);
 
@@ -103,7 +103,7 @@ std::vector<int> reservoir_sample(const size_t size, const size_t max_size)
    return sample_indices;
 }
 
-std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const double p_ne)
+std::string generate_pheno(const std::vector<Sample>& sample_names, const std::vector<int>& kept_indices, const std::tuple<double,double>& p_cases)
 {
    char * tmp_name_ptr;
    tmp_name_ptr = std::tmpnam(NULL);
@@ -114,7 +114,8 @@ std::string generate_pheno(const std::vector<Sample>& sample_names, const std::v
       throw std::runtime_error("Could not write to tmp pheno file");
    }
 
-   double p_e = 1 - p_ne;
+   double p_e, p_ne;
+   std::tie (p_e, p_ne) = p_cases;
    for (auto keep_it = kept_indices.begin(); keep_it != kept_indices.end(); ++keep_it)
    {
       // Generate pheno based on OR here
@@ -137,14 +138,23 @@ std::string generate_pheno(const std::vector<Sample>& sample_names, const std::v
 // Given a sample doesn't have the kmer, return the probability of having case
 // phenotype
 // Sr is the sample ratio
-double p_case_ne(const double OR, const double MAF, const double Sr)
+// See Biostatistical methods in Epidemiology, 2001 Appendix D
+std::tuple<double, double> p_case(const double OR, const double MAF, const double Sr)
 {
-   return(pow((1+pow(Sr, -1))*(MAF*(OR - 1) + 1), -1));
-}
+   // Convenient defines
+   const double m1 = Sr/(Sr + 1);
 
-double p_case_e(const double OR, const double MAF, const double Sr)
-{
-   return(1 - p_case_ne(OR, MAF, Sr));
+   // Quadratic equation
+   const double a = OR - 1;
+   const double b = -((m1 + MAF)*OR - m1 + 1 - MAF);
+   const double c = OR*m1*MAF;
+   double a1 = (-b - pow(pow(b, 2) - 4*a*c, 0.5)) / (2*a);
+
+   // Probabilities to return
+   double p_e = a1 / MAF;
+   double p_ne = (m1 - a1)/(1 - MAF);
+
+   return std::make_tuple(p_e, p_ne);
 }
 
 std::string cut_struct_mat(const arma::mat& struct_mat, const std::vector<int>& rows)
@@ -206,7 +216,7 @@ int parse_seer(std::string& seer_output)
 
 int main (int argc, char *argv[])
 {
-   if (argc != 4)
+   if (argc != 5)
    {
       throw std::runtime_error("Usage is: ./subsample_seer sample_names.txt dsm_matrix kmer_file");
    }
@@ -255,15 +265,25 @@ int main (int argc, char *argv[])
    // kmer file name
    std::string kmer_file_name(argv[3]);
 
+   // threads
+   int num_threads = std::stoi(argv[4]);
+   std::queue<std::thread> seer_threads;
+   seer_threads.reserve(num_threads);
+
    // Loop over odds ratios, then sample number
    // (const std::vector<std::string> _sample_names, const arma::mat _dsm_mat, const double _OR, const double _MAF, const double _Sr, const size_t _max_samples
    seer_hits run_seer(kmer_file_name, all_samples, struct_mat, (double) present_total/all_samples.size(), target_Sr);
-   for (double OR = start_OR; OR <= end_OR; OR += OR_step)
+   for (double OR = start_OR; OR <= end_OR; OR *= OR_step)
    {
       for (int num_samples = start_samples; num_samples <= end_samples; num_samples += samples_step)
       {
          for (int repeat = 1; repeat <= repeats; ++repeat)
          {
+            if (seer_threads.size() == num_threads)
+            {
+               std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
+               seer_threads.front()
+            }
             std::cout << OR << "\t" << num_samples << "\t" << repeat << "\t" << run_seer(num_samples, OR) << std::endl;
          }
       }
