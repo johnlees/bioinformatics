@@ -1,8 +1,8 @@
 PREFIX=${HOME}/software
 BINDIR=$(PREFIX)/bin
 
-#CXX=icpc
-CXXFLAGS=-Wall -g -O0 -std=c++11
+CXX=icpc
+CXXFLAGS=-Wall -O3 -parallel -ipo -std=c++11
 CPPFLAGS=-I$(PREFIX)/include
 LDLIBS=-L$(PREFIX)/lib -lboost_filesystem -lboost_system -lhdf5 -larmadillo -lz -lm
 
