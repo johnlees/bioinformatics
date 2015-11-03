@@ -23,7 +23,7 @@ while (my $vcf_line = <VCF>)
       my $mac = 0;
       foreach my $val (@vals)
       {
-         if ($val ne ".")
+         if ($val ne "0")
          {
             $mac++
          }
