@@ -6,7 +6,7 @@ CXXFLAGS=-Wall -O3 -parallel -ipo -std=c++11
 CPPFLAGS=-I$(PREFIX)/include
 LDLIBS=-L$(PREFIX)/lib -lboost_filesystem -lboost_system -lhdf5 -larmadillo -lz -lm
 
-PROGRAMS=subsample_seer
+PROGRAMS=subsample_seer trimeth_subsample
 
 all: $(PROGRAMS)
 
@@ -16,9 +16,6 @@ clean:
 install: all
 	install -d $(BINDIR)
 	install $(PROGRAMS) $(BINDIR)
-
-subsample_seer: subsample_seer.o
-	$(LINK.cpp) $^ $(LDLIBS) -o $@
 
 .PHONY: all test clean install
 
