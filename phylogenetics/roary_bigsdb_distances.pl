@@ -8,6 +8,25 @@ use Bio::SeqIO;
 my $roary_directory = $ARGV[0];
 my $number_samples = $ARGV[1];
 
+sub mat_val($$$)
+{
+   my ($i, $j, $array) = @_;
+
+   my $val = 0;
+   if ($j!=$i || defined($$array[$i][$j]))
+   {
+      if ($j<$i)
+      {
+         $val = $$array[$j][$i];
+      }
+      else
+      {
+         $val = $$array[$i][$j];
+      }
+   }
+   return $val;
+}
+
 if(!defined($roary_directory) || !defined($number_samples) || !-d $roary_directory)
 {
    print "Usage: ./roary_bigsdb_distances.pl <roary_alignment_directory> <number_of_samples>\n";
@@ -56,18 +75,11 @@ else
 
    for (my $i = 0; $i< $number_samples; $i++)
    {
-      print "0";
+      print mat_val($i, 0, \@dist_mat);
 
       for (my $j = 1; $j < $number_samples; $j++)
       {
-         if ($j<=$i || !defined($dist_mat[$i][$j]))
-         {
-            print ",0";
-         }
-         else
-         {
-            print ",$dist_mat[$i][$j]";
-         }
+         print "," . mat_val($i, $j, \@dist_mat);
       }
       print "\n";
    }
