@@ -116,36 +116,6 @@ sub merge_bams($$$)
    system ("samtools index $output_bam");
 }
 
-# Apply a list of filters to a vcf, filling in the filter column
-sub filter_vcf($$$)
-{
-   my ($vcf_file, $vcf_filters, $vcf_filter_names) = @_;
-
-   my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
-   my @vcf_filter_names_new = map{ $_ = "FAIL_" . $_ } @$vcf_filter_names;
-
-   my $filter_command = "";
-   foreach my $vcf_filter (@$vcf_filters)
-   {
-      my $filter_name = shift(@vcf_filter_names_new);
-
-      if ($filter_command eq "")
-      {
-         $filter_command .= "bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' $vcf_file";
-      }
-      else
-      {
-         $filter_command .= " | bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' -";
-      }
-   }
-
-   $filter_command .= " -O z -o $filtered_vcf";
-   system($filter_command);
-
-   rename $filtered_vcf, $vcf_file;
-   system("bcftools index -f $vcf_file");
-}
-
 #****************************************************************************************#
 #* Main                                                                                 *#
 #****************************************************************************************#
@@ -420,7 +390,7 @@ else
    }
 
    # Filter variants
-   filter_vcf($output_vcf, \@vcf_filters, \@vcf_filter_names);
+   mapping::filter_vcf($output_vcf, \@vcf_filters, \@vcf_filter_names);
 
    # Produced diff only vcf
    my $diff_vcf_name;

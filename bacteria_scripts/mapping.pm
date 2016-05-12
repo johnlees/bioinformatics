@@ -25,6 +25,10 @@ my $smalt_s = 6;
 
 my $smalt_max_insert = 750;
 
+# example VCF filters (defined in calling file)
+#my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"1\" && PL[1]/PL[0] > 0.75)", "QUAL < 50", "MQ < 30", "SP > 30", "MQSB < 0.001", "RPB < 0.001");
+#my @vcf_filter_names = ("DEPTH", "RATIO", "VAR_QUAL", "MAP_QUAL", "STRAND_BIAS", "MQ_BIAS", "RP_BIAS");
+
 our $snap_location = "/nfs/users/nfs_j/jl11/software/bin/snap";
 
 # Set java flags on module load. Use GATK key to disable phone home
@@ -290,6 +294,36 @@ sub indel_realign($$$)
 
    rename $realigned_bam, $bam_file;
    rename $realigned_bam_index, "$bam_file.bai";
+}
+
+# Apply a list of filters to a vcf, filling in the filter column
+sub filter_vcf($$$)
+{
+   my ($vcf_file, $vcf_filters, $vcf_filter_names) = @_;
+
+   my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
+   my @vcf_filter_names_new = map{ $_ = "FAIL_" . $_ } @$vcf_filter_names;
+
+   my $filter_command = "";
+   foreach my $vcf_filter (@$vcf_filters)
+   {
+      my $filter_name = shift(@vcf_filter_names_new);
+
+      if ($filter_command eq "")
+      {
+         $filter_command .= "bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' $vcf_file";
+      }
+      else
+      {
+         $filter_command .= " | bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' -";
+      }
+   }
+
+   $filter_command .= " -O z -o $filtered_vcf";
+   system($filter_command);
+
+   rename $filtered_vcf, $vcf_file;
+   system("bcftools index -f $vcf_file");
 }
 
 1;
