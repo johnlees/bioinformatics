@@ -297,11 +297,10 @@ sub indel_realign($$$)
 }
 
 # Apply a list of filters to a vcf, filling in the filter column
-sub filter_vcf($$$)
+sub filter_vcf($$$$)
 {
-   my ($vcf_file, $vcf_filters, $vcf_filter_names) = @_;
+   my ($vcf_file_in, $vcf_file_out, $vcf_filters, $vcf_filter_names) = @_;
 
-   my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
    my @vcf_filter_names_new = map{ $_ = "FAIL_" . $_ } @$vcf_filter_names;
 
    my $filter_command = "";
@@ -311,7 +310,7 @@ sub filter_vcf($$$)
 
       if ($filter_command eq "")
       {
-         $filter_command .= "bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' $vcf_file";
+         $filter_command .= "bcftools filter -s \"$filter_name\" -m + -e '$vcf_filter' $vcf_file_in";
       }
       else
       {
@@ -319,11 +318,8 @@ sub filter_vcf($$$)
       }
    }
 
-   $filter_command .= " -O z -o $filtered_vcf";
+   $filter_command .= " -O z -o $vcf_file_out";
    system($filter_command);
-
-   rename $filtered_vcf, $vcf_file;
-   system("bcftools index -f $vcf_file");
 }
 
 1;

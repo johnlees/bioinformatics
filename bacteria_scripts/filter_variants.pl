@@ -14,8 +14,6 @@ use File::Basename;
 use lib dirname( abs_path $0 ) . "/../assembly_scripts";
 use lib dirname( abs_path $0 );
 
-use File::Copy qw(copy);
-
 use mapping;
 
 # VCF filters
@@ -23,14 +21,15 @@ my @vcf_filters = ("FORMAT/DP < 4" , "(GT=\"0\" && PL[0]/PL[1] > 0.75) || (GT=\"
 my @vcf_filter_names = ("DEPTH", "RATIO", "VAR_QUAL", "MAP_QUAL", "PV4_BIAS", "MQ_BIAS", "RP_BIAS");
 
 my $usage_message = <<USAGE;
-Usage: ./filter_variants.pl -v <vcf_file>
+Usage: ./filter_variants.pl -v <vcf_file> -o <output>
 
 Applies basic filters to variants in a VCF. Modifies the FILTER field in the VCF provided
 USAGE
 
 #* gets input parameters
-my ($input_vcf, $help);
+my ($input_vcf, $output_vcf, $help);
 GetOptions("vcf|v=s"  => \$input_vcf,
+           "out|o=s" =>\$output_vcf,
             "help|h"     => \$help
           ) or die($usage_message);
 
@@ -41,18 +40,7 @@ if (defined($help) || !-e $input_vcf)
 else
 {
    # Filter variants
-   copy $input_vcf, "tmp$input_vcf";
-   mapping::filter_vcf($input_vcf, \@vcf_filters, \@vcf_filter_names);
-
-   if ($input_vcf =~ /^(.+_variant)\.bcf$/)
-   {
-      rename $input_vcf, "$1.filtered.vcf.gz";
-   }
-   else
-   {
-      rename $input_vcf, "filtered.$input_vcf.vcf.gz";
-   }
-   rename "tmp$input_vcf", $input_vcf;
+   mapping::filter_vcf($input_vcf, $output_vcf, \@vcf_filters, \@vcf_filter_names);
 }
 
 exit(0);
