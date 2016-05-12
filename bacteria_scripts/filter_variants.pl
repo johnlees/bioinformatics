@@ -5,6 +5,7 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
 use File::Spec;
 
 # Allows use of perl modules in ./
