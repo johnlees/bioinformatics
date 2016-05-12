@@ -3,6 +3,10 @@
 use strict;
 use warnings;
 
+# This informatively named script combines summary data from blastp and bowtie2
+# (via srst2) from many samples into a large design matrix, doing a small
+# amount of processing
+
 my $max_log = 709;
 
 sub safe_log($)
@@ -109,9 +113,9 @@ my @all_alleles = @cbpA_alleles;
 push(@all_alleles, @pspC_alleles);
 
 # Print the header
-print "sample.name";
+print "sample.name\tcbpA.allele\tpspC.allele";
 
-my @fields = ("srst2.coverage", "srst2.mismatches", "srst2.indels", "srst2.truncated", "velvet.p.id", "velvet.length", "velvet.mismatches", "velvet.gaps", "velvet.evalue", "velvet.bitscore", "spades.p.id", "spades.length", "spades.mismatches", "spades.gaps", "spades.evalue", "spades.bitscore");
+my @fields = ("srst2.coverage", "srst2.indels", "srst2.mismatches", "srst2.truncated", "velvet.bitscore", "velvet.evalue", "velvet.gaps", "velvet.length", "velvet.mismatches", "velvet.p.id", "spades.bitscore", "spades.evalue", "spades.gaps", "spades.length", "spades.mismatches", "spades.p.id");
 foreach my $allele (@all_alleles)
 {
    foreach my $field (@fields)
@@ -146,9 +150,27 @@ foreach my $sample (@sample_list)
    # print here
    print "$sample_name";
 
+   # print y
+   my $cbpA_allele = "NA";
+   my $pspC_allele = "NA";
+   if ($sample_name =~ /^pspC-(\d+)\.\d+$/)
+   {
+      if ($1 <= 6)
+      {
+         $cbpA_allele = $1;
+         $pspC_allele = 0;
+      }
+      else
+      {
+         $cbpA_allele = 0;
+         $pspC_allele = $1;
+      }
+   }
+   print "\t" . join("\t", $cbpA_allele, $pspC_allele);
+
    foreach my $allele (@all_alleles)
    {
-      # print srst2 results
+      # print srst2/blastp results
       print_results($allele,$srst2_results, 4);
       print_results($allele,$blastp_velvet_results, 6);
       print_results($allele,$blastp_spades_results, 6);
