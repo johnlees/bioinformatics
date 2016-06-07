@@ -390,11 +390,11 @@ else
    }
 
    # Filter variants
-   my $filtered_vcf = mapping::random_string() . "filtered.$vcf_file";
-   mapping::filter_vcf($output_vcf, \@vcf_filters, \@vcf_filter_names);
+   my $filtered_vcf = mapping::random_string() . "filtered.$output_vcf";
+   mapping::filter_vcf($output_vcf, $filtered_vcf, \@vcf_filters, \@vcf_filter_names);
 
-   rename $filtered_vcf, $vcf_file;
-   system("bcftools index -f $vcf_file");
+   rename $filtered_vcf, $output_vcf;
+   system("bcftools index -f $output_vcf");
 
    # Produced diff only vcf
    my $diff_vcf_name;
