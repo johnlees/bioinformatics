@@ -36,6 +36,7 @@ of samples
                      Comma separated, cortex then mapping.
                      Default 1,1
    --no_annotate     Don't annotate vcfs (for problem cases)
+   --sample_names    Comma separated. Default csf,blood
 
    --cortex          Run cortex step only
    --map             Run map step only
@@ -47,6 +48,8 @@ USAGE
 
 my $cortex_mem = 2000;
 my $map_memory = 4000;
+
+my @default_sample_names = ("csf", "blood");
 
 my $cortex_cores = 1;
 my $map_cores = 1;
@@ -71,7 +74,7 @@ sub get_fastq($$)
 #* Main                                                               *#
 #**********************************************************************#
 my ($lane_file, $assembly_directory, $output_directory, $dirty, $mem_string, $no_symlinks,
-    ,$core_string, $no_annotate, $cortex_only, $map_only, $help);
+    ,$core_string, $no_annotate, $cortex_only, $map_only, $sample_names, $help);
 GetOptions("lanes=s" => \$lane_file,
            "output|o=s" => \$output_directory,
            "assembly_dir=s" => \$assembly_directory,
@@ -81,6 +84,7 @@ GetOptions("lanes=s" => \$lane_file,
            "map" => \$map_only,
            "mem=s" => \$mem_string,
            "cores=s" => \$core_string,
+           "sample_names=s" => \$sample_names,
            "help|h" => \$help) || die("$!\n$usage_message");
 
 # Parse options
@@ -126,9 +130,14 @@ else
 
          chdir $sample;
 
+         if (defined($sample_names))
+         {
+            @default_sample_names = split(",", $sample_names);
+         }
+
          open(READS, ">reads.txt") || die("Could not write to $sample/reads.txt\n");
-         print READS join("\t", $sample . "_csf", File::Spec->rel2abs("$csf_lane" . "_1.fastq.gz"), File::Spec->rel2abs("$csf_lane" . "_2.fastq.gz") .
-                                "\n$sample" . "_blood", File::Spec->rel2abs("$blood_lane" . "_1.fastq.gz"), File::Spec->rel2abs("$blood_lane" . "_2.fastq.gz"));
+         print READS join("\t", $sample . "_$default_sample_names[0]", File::Spec->rel2abs("$csf_lane" . "_1.fastq.gz"), File::Spec->rel2abs("$csf_lane" . "_2.fastq.gz") .
+                                "\n$sample" . "_$default_sample_names[1]", File::Spec->rel2abs("$blood_lane" . "_1.fastq.gz"), File::Spec->rel2abs("$blood_lane" . "_2.fastq.gz"));
          close READS;
       }
       else
