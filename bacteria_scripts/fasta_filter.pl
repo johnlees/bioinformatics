@@ -37,7 +37,7 @@ while (!eof(FASTA))
    }
    else
    {
-      print $line_in "\n";
+      print $line_in . "\n";
       while($line_in = <FASTA>)
       {
          if ($line_in =~ m/^>(.+)$/)
