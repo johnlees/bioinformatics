@@ -96,6 +96,10 @@ sub run_improvement($$$$)
    my $renamed_improvement = "improved_assembly.fa";
 
    # Run improvement pipeline (requires pathogen softwarerc)
+   if (!-d $output_directory)
+   {
+      mkdir $output_directory;
+   }
    my $improve_command = "cd $output_directory && improve_assembly -a $contigs_file -f $forward_reads -r $reverse_reads -o $output_directory";
    system($improve_command);
 
