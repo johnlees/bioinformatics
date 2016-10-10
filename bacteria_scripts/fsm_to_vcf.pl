@@ -21,7 +21,7 @@ my @samples;
 while (my $line_in = <PHENO>)
 {
    chomp $line_in;
-   my ($fid, $iid, $pheno) = split("\t", $line_in);
+   my ($fid, $iid, $pheno) = split(/\s+/, $line_in);
 
    push(@samples, $iid);
 }
