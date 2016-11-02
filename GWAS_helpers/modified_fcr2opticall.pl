@@ -13,7 +13,7 @@ my $manifest_file = $ARGV[0];
 my $snp_regex = qr/^\[(.)\/(.)\]$/;
 
 my @sample_names;
-open(SAMPLES, "sample_names.txt") || die("Could not open sample_names.txt\n");
+open(SAMPLES, "../sample_names_new.txt") || die("Could not open ../sample_names_new.txt\n");
 while (my $line_in = <SAMPLES>)
 {
    chomp $line_in;
@@ -38,10 +38,10 @@ for (my $i = 1; $i <= 22; $i++)
 }
 
 # Open files
-my @in_file_h;
-for (my $i = 1; $i <= 904; $i++)
+my %in_file_h;
+foreach my $sample_name (@sample_names)
 {
-   open($in_file_h[$i], "$i.int") || die("Could not read input file $i: $!\n");
+   open($in_file_h{$sample_name}, "$sample_name.int") || die("Could not read input file $sample_name.int: $!\n");
 }
 
 while (my $line_in = <MANIFEST>)
@@ -50,20 +50,35 @@ while (my $line_in = <MANIFEST>)
 
    my @fields = split(",", $line_in);
    $fields[5] =~ $snp_regex;
+   my $chr = $fields[2];
 
-   unless ($fields[2] eq "X" || $fields[2] eq "Y" || $fields[2] eq "XY" || $fields[2] eq "0")
+   if ($chr eq "X" || $chr eq "Y" || $chr eq "XY" || $chr eq "0" || $chr > 22)
    {
-      print { $file_h[$fields[2]] } join("\t", $fields[1], $fields[3], "$1$2") ;
-
-      for (my $i = 1; $i <= 904; $i++)
+      # read but don't do anything
+      foreach my $sample_name (@sample_names)
       {
-         my $sample_line = readline($in_file_h[$i]);
+         my $sample_line = readline($in_file_h{$sample_name});
+      }
+   }
+   else
+   {
+      print { $file_h[$chr] } join("\t", $fields[1], $fields[3], "$1$2") ;
+
+      foreach my $sample_name (@sample_names)
+      {
+         my $sample_line = readline($in_file_h{$sample_name});
          chomp $sample_line;
          my @sample_fields = split("\t", $sample_line);
 
-         print { $file_h[$fields[2]] } "\t" . join("\t", @sample_fields[1 .. 2]);
+         if ($sample_fields[0] ne $fields[1])
+         {
+            print STDERR $sample_fields[0] . " ne $fields[1] in $sample_name\n";
+            die;
+         }
+
+         print { $file_h[$chr] } "\t" . join("\t", @sample_fields[1 .. 2]);
       }
-      print { $file_h[$fields[2]] } "\n";
+      print { $file_h[$chr] } "\n";
    }
 }
 close MANIFEST;
